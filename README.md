@@ -16,7 +16,7 @@ For MicroBooNE this includes:
 
 # To Do List
 
-## working setup
+## for minimal working setup
 
 * broker class
 * worker class base
@@ -31,6 +31,10 @@ For MicroBooNE this includes:
 * python binding test of simple client and broker
 * python binding test of larcv image2d passing protocol
 
+## real applications
 
+* caffe (from python) ssnet service (translation of existing ssnetserver)
+* pytorch ssnet service using torch script
+* pytorch ssnet service for sparse convnet
 
 ## additional features
