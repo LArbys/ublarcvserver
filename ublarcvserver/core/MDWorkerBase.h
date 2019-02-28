@@ -11,7 +11,7 @@
 
 #include "majordomo_library.h"
 
-namespace ublcvserver {
+namespace ublarcvserver {
 
   class MDWorkerBase {
 

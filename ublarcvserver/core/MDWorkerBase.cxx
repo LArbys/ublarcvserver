@@ -2,7 +2,7 @@
 #include <sstream>
 #include <exception>
 
-namespace ublcvserver {
+namespace ublarcvserver {
 
   size_t MDWorkerBase::_ninstances = 0;
 
