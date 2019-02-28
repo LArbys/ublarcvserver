@@ -28,6 +28,15 @@ namespace ublarcvserver {
         mdp_worker_set_verbose(_pworker);
     }
 
+  /**
+  * destructor
+  *
+  */
+  MDWorkerBase::~MDWorkerBase() {
+    std::cout << "destroy mdp_worker" << std::endl;
+    mdp_worker_destroy(&_pworker);
+    _pworker = nullptr;
+  }
 
   /**
   * create mdp worker and connect to server
@@ -70,9 +79,13 @@ namespace ublarcvserver {
   *
   */
   void MDWorkerBase::run() {
+    std::cout << "WORKER RUN" << std::endl;
+    /*
     while (1) {
       do_job();
     }
+    */
+    do_job();
   }
 
   void MDWorkerBase::do_job() {
@@ -83,7 +96,7 @@ namespace ublarcvserver {
     char* cmd = nullptr;
     try {
       cmd = zstr_recv(worker_sock);
-      std::cout << "Got command from client: " << std::string(cmd) << std::endl;
+      //std::cout << "Got command from client: " << std::string(cmd) << std::endl;
     }
     catch (std::exception& e) {
       std::stringstream ss;
@@ -110,11 +123,14 @@ namespace ublarcvserver {
       zmsg_t* msg_response = zmsg_new();
       int nresponses_to_frame = 0;
       MDWorkerMsg_t response;
-      while ( done_w_frame ) {
+      while ( !done_w_frame ) {
         // get response to message
+        //std::cout << "call user process_message" << std::endl;
         response = process_message( nframes_in,
                                     nresponses_to_frame,
                                     frame_message );
+        //std::cout << "response: " << response.msg << std::endl;
+        std::cout.flush();
         zmsg_addstr(msg_response, response.msg.c_str() );
         nresponses_to_frame++;
         if ( response.done_with_frame==1 ) {
@@ -127,6 +143,7 @@ namespace ublarcvserver {
       if ( !response.isfinal ) {
         // not the final chunk, so we send a particle chunk
         // Make a copy of address, because mdp_worker_send_partial will free it
+        //std::cout << "respond partial." << std::endl;
         zframe_t *address2 = zframe_dup(address);
         mdp_worker_send_partial(_pworker, &address2, &msg_response);
         npartial_out++;
@@ -135,6 +152,7 @@ namespace ublarcvserver {
       }
       else {
         // final, we send final frame_message. spend the last address
+        //std::cout << "respond to frame with final msg" << std::endl;
         mdp_worker_send_final( _pworker, &address, &msg_response );
         sent_final = true;
         npartial_out++;

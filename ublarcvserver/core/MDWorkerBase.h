@@ -19,7 +19,7 @@ namespace ublarcvserver {
   public:
     MDWorkerBase( std::string service_name, std::string server_addr,
                   std::string idname="", bool verbose=false );
-    virtual ~MDWorkerBase(){};
+    virtual ~MDWorkerBase();
 
     std::string get_service_name() { return _service_name; };
     std::string get_id_name() { return _id_name; };

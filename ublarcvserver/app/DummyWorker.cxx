@@ -1,5 +1,6 @@
 #include "DummyWorker.h"
 
+#include <iostream>
 
 namespace ublarcvserver {
 
@@ -9,8 +10,10 @@ namespace ublarcvserver {
     MDWorkerMsg_t out;
     out.msg = "Partial response to "+std::string(msg);
     out.done_with_frame = 1;
-    out.isfinal = 1;
-
+    out.isfinal = 0;
+    std::cout << "[DummyWorker]: replying to client msg" << std::endl;
+    std::cout << "worker msg: " << out.msg << std::endl;
+    std::cout.flush();
     return out;
   }
 

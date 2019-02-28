@@ -57,14 +57,24 @@ namespace ublarcvserver {
     zsock_t *client_sock = mdp_client_msgpipe(_client);
 
     // blocking recv
-    char* cmd;
-    zmsg_t *message;
-    res = zsock_recv(client_sock, "sm", &cmd, &message);
-    printf("Client (2): got command %s\n", cmd);
-    printf(" Response body:\n");
-    std::cout << "[DummyClient] received last frame." << std::endl;
-    zmsg_print(message);
-    zmsg_destroy(&message);
+    bool hasfinal = false;
+    while (!hasfinal) {
+      char* cmd;
+      zmsg_t *message;
+      res = zsock_recv(client_sock, "sm", &cmd, &message);
+      printf("Client (2): got command %s\n", cmd);
+      std::cout << " Response body: " << std::endl;
+      zmsg_print(message);
+      if (std::string(cmd)=="PARTIAL") {
+        std::cout << "continue reading." << std::endl;
+      }
+      else {
+        std::cout << "[DummyClient] received last frame." << std::endl;
+        hasfinal = true;
+      }
+      std::cout.flush();
+      zmsg_destroy(&message);
+    }
   }
 
 }
