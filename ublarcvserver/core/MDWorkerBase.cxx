@@ -2,10 +2,18 @@
 #include <iostream>
 #include <sstream>
 #include <exception>
+#include <csignal>
 
 namespace ublarcvserver {
 
   size_t MDWorkerBase::_ninstances = 0;
+  sig_atomic_t MDWorkerBase::_signaled = 0;
+
+  void signalHandler(int sig) {
+    std::cout << "SIGNAL " << sig << "interrupt seen" << std::endl;
+    //destroyWorker();
+    MDWorkerBase::set_signal();
+  }
 
   MDWorkerBase::MDWorkerBase( std::string service_name,
     std::string server_addr, std::string id_name, bool verbose )
@@ -26,6 +34,10 @@ namespace ublarcvserver {
 
       if ( verbose )
         mdp_worker_set_verbose(_pworker);
+
+     // define signal handler
+     signal(SIGINT, signalHandler);
+
     }
 
   /**
@@ -33,6 +45,11 @@ namespace ublarcvserver {
   *
   */
   MDWorkerBase::~MDWorkerBase() {
+    destroyWorker();
+  }
+
+  void MDWorkerBase::destroyWorker() {
+    if (!_pworker) return;
     std::cout << "destroy mdp_worker" << std::endl;
     mdp_worker_destroy(&_pworker);
     _pworker = nullptr;
@@ -80,17 +97,32 @@ namespace ublarcvserver {
   */
   void MDWorkerBase::run() {
     std::cout << "WORKER RUN" << std::endl;
-    /*
     while (1) {
-      do_job();
+      bool job_performed = do_job();
+      //if ( job_performed ) break;
+      if ( _signaled )
+        break;
     }
-    */
-    do_job();
   }
 
-  void MDWorkerBase::do_job() {
+  bool MDWorkerBase::do_job() {
     // get socket for worker
     zsock_t *worker_sock = mdp_worker_msgpipe(_pworker);
+    const char* socket_type = zsock_type_str( worker_sock );
+    std::cout << "Worker socket type: " << socket_type << std::endl;
+
+    // get a poller for the socket type
+    zpoller_t* worker_poll = zpoller_new(worker_sock);
+
+    // start a poll
+    zsock_t* pollin_socket = (zsock_t*)zpoller_wait(worker_poll, 1*1000);
+    if ( zpoller_expired(worker_poll) ) {
+      // poller ends due to time-out. exit this loop.
+      return false;
+    }
+    std::cout << "poller found input command" << std::endl;
+
+    // if got an input, keep going
 
     // get request from the broker
     char* cmd = nullptr;
@@ -169,6 +201,9 @@ namespace ublarcvserver {
       zmsg_addstr(msg_response, finmsg);
       mdp_worker_send_final( _pworker, &address, &msg_response );
     }
-
+    zpoller_destroy( &worker_poll );
+    return true;
   }//end of do_job
+
+
 }
