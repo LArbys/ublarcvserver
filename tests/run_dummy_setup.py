@@ -40,8 +40,10 @@ print "broker started"
 client = ublarcvserver.DummyClient(endpoint, True)
 print "client created"
 
-
-client.request()
+for x in xrange(5):
+    print "REQUEST %d"%(x+1)
+    client.request()
+    time.sleep(2)
 
 print "[ENTER] to end"
 raw_input()
