@@ -10,12 +10,24 @@ Also servers as an example.
 We also setup the basic larcv client and worker, which pass larcv images back and forth.
 """
 
+# endpoint:
+endpoint  = "tcp://localhost:6002"
+bindpoint = "tcp://*:6002"
+
 # setup the broker
-broker = ublarcvserver.MDBroker("tcp://*:6002", True)
+broker = ublarcvserver.MDBroker(bindpoint, True)
 broker.start()
+print "broker started"
 
+# setup the client
+client = ublarcvserver.DummyClient(endpoint, True)
+print "client created"
 
+# setup the worker
+worker = ublarcvserver.DummyWorker(endpoint, True)
+print "worker created"
 
-print broker
+client.request()
 
-
+print "[ENTER] to end"
+raw_input()

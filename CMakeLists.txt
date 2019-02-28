@@ -41,13 +41,16 @@ find_package(ROOT CONFIG REQUIRED)
 # --- Define useful ROOT functions and macros (e.g. ROOT_GENERATE_DICTIONARY)
 include(${ROOT_USE_FILE})
 
-#---Add base of source
+# Set useful variables
+set(UBLARCVSERVER_BASEDIR "${CMAKE_CURRENT_SOURCE_DIR}")
+set(UBLARCVSERVER_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include")
+set(UBLARCVSERVER_LIBRARY_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+
+# Add base of source
 add_subdirectory(ublarcvserver)
 
 #---Configuration export
 include(CMakePackageConfigHelpers)
-set(UBLARCVSERVER_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include")
-set(UBLARCVSERVER_LIBRARY_DIR "${CMAKE_INSTALL_PREFIX}/lib")
 set(TARGETS_EXPORT_NAME "ublarcvserverTargets")
 configure_package_config_file("cmake/Config.cmake.in"
   "${CMAKE_INSTALL_PREFIX}/share/ublarcvserver/ublarcvserverConfig.cmake"

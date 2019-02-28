@@ -10,6 +10,7 @@
 #include <string>
 
 #include "majordomo_library.h"
+#include "MDWorkerMsg.h"
 
 namespace ublarcvserver {
 
@@ -17,20 +18,26 @@ namespace ublarcvserver {
 
   public:
     MDWorkerBase( std::string service_name, std::string server_addr,
-                  std::string idname="" );
+                  std::string idname="", bool verbose=false );
     virtual ~MDWorkerBase(){};
 
     std::string get_service_name() { return _service_name; };
     std::string get_id_name() { return _id_name; };
 
-    // starts worker
+    // starts worker loop
     void run();
-
-    virtual void process_message() = 0;
 
   protected:
 
-    void connect(std::string server_addr);
+    void create(std::string server_addr);
+
+    // job loop
+    void do_job();
+
+    // function user provides to process message
+    virtual MDWorkerMsg_t process_message(const int ninputframes,
+                                          const int nresponses_to_frame,
+                                          char* msg) = 0;
 
   private:
 
