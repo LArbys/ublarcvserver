@@ -36,8 +36,9 @@ namespace ublarcvserver {
         mdp_worker_set_verbose(_pworker);
 
      // define signal handler
-     signal(SIGINT, signalHandler);
-
+     signal(SIGINT,  signalHandler);
+     signal(SIGTERM, signalHandler);
+     signal(SIGABRT, signalHandler);
     }
 
   /**

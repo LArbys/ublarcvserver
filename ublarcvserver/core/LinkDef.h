@@ -13,6 +13,7 @@
 #pragma link C++ namespace ublarcvserver+;
 #pragma link C++ struct ublarcvserver::MDWorkerMsg_t+;
 #pragma link C++ class ublarcvserver::MDWorkerBase+;
+#pragma link C++ class ublarcvserver::MDClientBase+;
 //ADD_NEW_CLASS ... do not change this line
 
 #endif

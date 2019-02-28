@@ -4,21 +4,25 @@
 #include <string>
 
 #include "majordomo_library.h"
+#include "ublarcvserver/core/MDClientBase.h"
 
 namespace ublarcvserver {
 
-  class DummyClient {
-  public:
-    DummyClient(std::string broker_addr, bool verbose);
-    virtual ~DummyClient();
+  class DummyClient : public MDClientBase {
 
-    void request();
-    
+  public:
+
+    DummyClient(std::string broker_addr, bool verbose)
+    : MDClientBase( broker_addr, "dummy", verbose )
+    {};
+
+    virtual ~DummyClient() {};
+
   protected:
 
-
-    std::string _broker_addr;
-    mdp_client_t *_client;
+    // user provided concrete methods
+    zmsg_t* make_request_message();
+    bool process_reply( zmsg_t* );
 
   };
 
