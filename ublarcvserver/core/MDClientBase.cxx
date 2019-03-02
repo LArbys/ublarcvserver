@@ -92,28 +92,37 @@ namespace ublarcvserver {
 
       //std::cout << "poller found input command" << std::endl;
       char* cmd   = 0;
-      zmsg_t *frame_reply = 0;
+      zmsg_t *frame_reply = nullptr;
 
       res = zsock_recv(client_sock, "sm", &cmd, &frame_reply);
+      //std::cout << "[MDClientBase] Number of frames in message received: "
+      //          << zmsg_size(frame_reply)
+      //          << std::endl;
 
       if ( frame_reply ) {
-        zframe_t *current_frame = zmsg_first(frame_reply);
-        zmsg_append( full_reply, &current_frame );
+        zframe_t *current_frame = zmsg_pop(frame_reply);
+        while ( current_frame ) {
+          zmsg_append( full_reply, &current_frame );
+          current_frame = zmsg_pop(frame_reply);
+        }
+        //std::cout << "[MDClientBase] Append message."
+        //          << " nframes=" << zmsg_size( full_reply )
+        //          << std::endl;
       }
 
       //printf("Client (2): got command %s\n", cmd);
       //std::cout << " Response body: " << std::endl;
       //zmsg_print(message);
       if (std::string(cmd)=="PARTIAL") {
-        std::cout << "continue reading." << std::endl;
+        //std::cout << "continue reading." << std::endl;
       }
       else {
-        std::cout << "[MDClientBase] received last frame." << std::endl;
+        //std::cout << "[MDClientBase] received last frame." << std::endl;
         hasfinal = true; // will stop the loop
       }
-      zmsg_print(full_reply);
-      std::cout.flush();
-    }
+      //zmsg_print(full_reply);
+      //std::cout.flush();
+    }//end of receiving reply loop
 
     // now that message has been collected, process it
     // this is a user function
@@ -121,7 +130,7 @@ namespace ublarcvserver {
 
     // we're done with the message, destroy it
     zmsg_destroy( &msg );
-    zmsg_destroy(&full_reply);
+    zmsg_destroy( &full_reply );
 
     // done with the poller
     zpoller_destroy( &client_poll );

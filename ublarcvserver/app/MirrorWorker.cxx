@@ -9,9 +9,11 @@ namespace ublarcvserver {
     MDWorkerMsg_t out;
     out.msg = zmsg_dup(msg);
     out.isfinal = 1;
-    std::cout << "[MirrorWorker]:"
-              << " duplicating message and sending back." << std::endl;
-    std::cout.flush();
+    //std::cout << "[MirrorWorker]: "
+    //          << "duplicating message and sending back. "
+    //          << " frames in msg=" << zmsg_size(out.msg)
+    //          << std::endl;
+    //std::cout.flush();
     return out;
   }
 

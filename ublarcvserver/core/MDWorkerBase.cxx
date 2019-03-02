@@ -51,7 +51,7 @@ namespace ublarcvserver {
 
   void MDWorkerBase::destroyWorker() {
     if (!_pworker) return;
-    std::cout << "destroy mdp_worker" << std::endl;
+    //std::cout << "destroy mdp_worker" << std::endl;
     mdp_worker_destroy(&_pworker);
     _pworker = nullptr;
   }
@@ -97,7 +97,7 @@ namespace ublarcvserver {
   *
   */
   void MDWorkerBase::run() {
-    std::cout << "WORKER RUN" << std::endl;
+    //std::cout << "WORKER RUN" << std::endl;
     while (1) {
       bool job_performed = do_job();
       //if ( job_performed ) break;
@@ -121,7 +121,7 @@ namespace ublarcvserver {
       // poller ends due to time-out. exit this loop.
       return false;
     }
-    std::cout << "poller found input command" << std::endl;
+    //std::cout << "poller found input command" << std::endl;
 
     // if got an input, keep going
 
@@ -151,7 +151,7 @@ namespace ublarcvserver {
       //char *frame_message = zframe_strdup(current_frame);
 
       bool done_w_frame = false;
-      zmsg_t* msg_response = zmsg_new();
+      //zmsg_t* msg_response = zmsg_new();
       MDWorkerMsg_t response;
 
       // get response to message
@@ -163,13 +163,18 @@ namespace ublarcvserver {
       // add reply to message
       if ( !response.msg ) {
         // msg not filled, so use string
-        zmsg_addstr(msg_response, response.str_msg.c_str() );
+        response.msg = zmsg_new();
+        zmsg_addstr( response.msg, response.str_msg.c_str() );
       }
-      else {
-        // msg filled, so use this
-        zmsg_addmsg(msg_response, &(response.msg) );
-      }
-      npartial_out++;
+      //else {
+      //  // msg filled, so use this
+      //  std::cout << "add msg: "
+      //            << " nframes=" << zmsg_size(response.msg)
+      //            << " frame1=" << zframe_size(zmsg_first(response.msg))
+      //            << std::endl;
+      //  zmsg_addmsg(msg_response, &(response.msg) );
+      //}
+      //npartial_out++;
 
       // send the message
       if ( !response.isfinal ) {
@@ -177,14 +182,17 @@ namespace ublarcvserver {
         // Make a copy of address, because mdp_worker_send_partial will free it
         //std::cout << "respond partial." << std::endl;
         zframe_t *address2 = zframe_dup(address);
-        mdp_worker_send_partial(_pworker, &address2, &msg_response);
+        mdp_worker_send_partial(_pworker, &address2, &response.msg);
         npartial_out++;
         // go to next frame, or if final.
       }
       else {
         // final, we send final frame_message. send the last address
-        //std::cout << "respond to frame with final msg" << std::endl;
-        mdp_worker_send_final( _pworker, &address, &msg_response );
+        //std::cout << "[MDWorkerBase] respond to frame with final msg."
+        //          << " number of frames=" << zmsg_size(response.msg)
+        //          << " frame1=" << zframe_size(zmsg_first(response.msg))
+        //          << std::endl;
+        mdp_worker_send_final( _pworker, &address, &response.msg );
         sent_final = true;
         npartial_out++;
       }

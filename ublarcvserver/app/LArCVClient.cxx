@@ -10,7 +10,8 @@ namespace ublarcvserver {
   *  @param[in] img Image2D to store
   */
   void LArCVClient::addImage( const larcv::Image2D& img ) {
-    _images_toworker_v.push_back( ImgStoreMeta_t(&img, 0, 0, false ) );
+    //std::cout << __FUNCTION__ << std::endl;
+    _images_toworker_v.push_back( ImgStoreMeta_t(&img, 0, 0, true ) );
   }
 
   /**
@@ -23,7 +24,8 @@ namespace ublarcvserver {
     const larcv::Image2D& img,
     const float threshold )
   {
-     _images_toworker_v.push_back( ImgStoreMeta_t(&img,0,threshold,true));
+    //std::cout << __FUNCTION__ << std::endl;
+    _images_toworker_v.push_back( ImgStoreMeta_t(&img,0,threshold,false));
   }
 
   /**
@@ -38,9 +40,10 @@ namespace ublarcvserver {
     const larcv::Image2D& img, const larcv::Image2D& img_select,
     const float threshold )
   {
-     _images_toworker_v.push_back(
-       ImgStoreMeta_t(&img,&img_select,threshold,true)
-     );
+    //std::cout << __FUNCTION__ << std::endl;
+    _images_toworker_v.push_back(
+      ImgStoreMeta_t(&img,&img_select,threshold,false)
+    );
   }
 
 
@@ -72,7 +75,7 @@ namespace ublarcvserver {
       }
       else {
         zmsg_addstr(msg,"sparseimg2d");
-        if ( imgstore.select ) {
+        if ( !imgstore.select ) {
           bson = larcv::json::as_bson_pixelarray( *imgstore.img,
                                                   imgstore.threshold );
         }
@@ -84,6 +87,8 @@ namespace ublarcvserver {
 
       zmsg_addmem( msg, (const void*)bson.data(), bson.size() );
     }
+    //std::cout << "LArCVClient: make request_message. "
+    //          << "number of frames=" << zmsg_size(msg) << std::endl;
     return msg;
   }
 
@@ -91,26 +96,41 @@ namespace ublarcvserver {
   * turn zmq image into list of image2Ds
   */
   bool LArCVClient::process_reply( zmsg_t* msg ) {
+    // clear out past images
+    // also, since we received a reply, we already sent messages, so
+    //   clear out input meta data
+    _images_toworker_v.clear();
     _images_received_v.clear();
+
+    //std::cout << "larcvclient: process_reply. number of messages= "
+    //          << zmsg_size(msg)
+    //          << std::endl;
+
     zframe_t* img_frame = zmsg_first(msg);
     while ( img_frame ) {
+      //std::cout << "LArCVClient: start message parsing" << std::endl;
+
+
       // frame: image type
       char* imgtype = zframe_strdup(img_frame);
-      img_frame = zmsg_next(msg);
       std::string strimgtype = imgtype;
       free(imgtype);
+      //std::cout << "image type: " << strimgtype << std::endl;
+      img_frame = zmsg_next(msg);
 
       // frame: data
       size_t nbytes = zframe_size(img_frame);
       std::vector<uint8_t> bson( nbytes );
-      memcpy( bson.data(), zframe_data(img_frame), nbytes );
-
+      memcpy( bson.data(), zframe_data(img_frame), nbytes*sizeof(uint8_t) );
+      //std::cout << strimgtype << " msg size: " << nbytes << std::endl;
 
       if ( strimgtype=="denseimg2d" ) {
+        //std::cout << "dense image2d from bson" << std::endl;
         larcv::Image2D img2d = larcv::json::image2d_from_bson( bson );
         _images_received_v.emplace_back( std::move(img2d) );
       }
       else if ( strimgtype=="sparseimg2d") {
+        //std::cout << "sparse image2d from bson" << std::endl;
         larcv::Image2D img2d=larcv::json::image2d_from_bson_pixelarray(bson);
         _images_received_v.emplace_back( std::move(img2d) );
       }
@@ -119,9 +139,23 @@ namespace ublarcvserver {
       }
 
       // next frame
+      //std::cout << "get next frame" << std::endl;
       img_frame = zmsg_next(msg);
     }
     return true;
+  }
+
+  /**
+  * take the images from the client
+  *
+  * @param[inout] image_v Vector for image2D
+  *
+  */
+  void LArCVClient::takeImages( std::vector<larcv::Image2D>& image_v ) {
+    for ( auto &img : _images_received_v ) {
+      image_v.emplace_back( std::move(img) );
+    }
+    _images_received_v.clear();
   }
 
 }
