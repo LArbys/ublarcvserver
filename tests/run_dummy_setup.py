@@ -10,10 +10,12 @@ Also servers as an example.
 
 We also setup the basic larcv client and worker, which pass larcv images back and forth.
 """
+verbose = False
 
 def start_worker( endpoint ):
+    global verbose
     print "start worker on ",endpoint
-    worker = ublarcvserver.DummyWorker(endpoint, True)
+    worker = ublarcvserver.DummyWorker(endpoint, verbose)
     print "worker started: ",worker.get_id_name()    
     worker.run()
     #while 1:
@@ -32,12 +34,12 @@ pworker.start()
 print "worker process created"
 
 # setup the broker
-broker = ublarcvserver.MDBroker(bindpoint, True)
+broker = ublarcvserver.MDBroker(bindpoint, verbose)
 broker.start()
 print "broker started"
 
 # setup the client
-client = ublarcvserver.DummyClient(endpoint, True)
+client = ublarcvserver.DummyClient(endpoint, verbose)
 print "client created"
 
 for x in xrange(5):

@@ -10,7 +10,7 @@ list(FILTER HEADERS EXCLUDE REGEX ".*LinkDef.h$")
 file(GLOB SOURCES "*.cxx")
 
 # additional headers
-include_directories ( "${LIBMDP_INC_DIR}"  "${UBLARCVSERVER_BASEDIR}")
+include_directories ( "${LIBMDP_INC_DIR}"  "${UBLARCVSERVER_BASEDIR}" "${LARCV_INCLUDE_DIR}")
 
 # Generate the dictionary
 ROOT_GENERATE_DICTIONARY(G__${MODULE_NAME} ${HEADERS} LINKDEF LinkDef.h)
@@ -18,7 +18,7 @@ ROOT_GENERATE_DICTIONARY(G__${MODULE_NAME} ${HEADERS} LINKDEF LinkDef.h)
 # Generate the shared library from the sources
 add_library(${MODULE_NAME} SHARED ${SOURCES} G__${MODULE_NAME}.cxx)
 set_target_properties(${MODULE_NAME} PROPERTIES PUBLIC_HEADER "${HEADERS}")
-target_link_libraries(${MODULE_NAME} PUBLIC ${ROOT_LIBS} ${LIBMDP_LIBRARIES} )
+target_link_libraries(${MODULE_NAME} PUBLIC ${ROOT_LIBS} ${LIBMDP_LIBRARIES} LArCVCoreBase LArCVCoreDataFormat LArCVCoreJSON)
 
 install(TARGETS ${MODULE_NAME}
   EXPORT ublarcvserver

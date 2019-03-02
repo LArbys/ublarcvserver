@@ -108,7 +108,7 @@ namespace ublarcvserver {
         std::cout << "continue reading." << std::endl;
       }
       else {
-        std::cout << "[DummyClient] received last frame." << std::endl;
+        std::cout << "[MDClientBase] received last frame." << std::endl;
         hasfinal = true; // will stop the loop
       }
       zmsg_print(full_reply);

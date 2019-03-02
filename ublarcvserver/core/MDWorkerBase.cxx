@@ -110,7 +110,7 @@ namespace ublarcvserver {
     // get socket for worker
     zsock_t *worker_sock = mdp_worker_msgpipe(_pworker);
     const char* socket_type = zsock_type_str( worker_sock );
-    std::cout << "Worker socket type: " << socket_type << std::endl;
+    //std::cout << "Worker socket type: " << socket_type << std::endl;
 
     // get a poller for the socket type
     zpoller_t* worker_poll = zpoller_new(worker_sock);

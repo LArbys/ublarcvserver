@@ -41,6 +41,10 @@ find_package(ROOT CONFIG REQUIRED)
 # --- Define useful ROOT functions and macros (e.g. ROOT_GENERATE_DICTIONARY)
 include(${ROOT_USE_FILE})
 
+#---LARCV
+set( larcv_DIR $ENV{LARCV_BASEDIR}/build/installed/lib/cmake/larcv/)
+find_package(larcv CONFIG REQUIRED)
+
 # Set useful variables
 set(UBLARCVSERVER_BASEDIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(UBLARCVSERVER_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include")
