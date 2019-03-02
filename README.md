@@ -22,14 +22,14 @@ For MicroBooNE this includes:
 * worker class base [done]
 * worker class dummy [done]
 * client class base [done]
-* worker class larcv image passing
-* worker class larcv image passing base
+* worker class larcv image passing [done]
+* worker class larcv image passing base [done]
 * worker class larcv image + network processing
 
 ## test setup
 
 * python binding test of simple dummy client and broker [done]
-* python binding test of larcv image2d passing protocol
+* python binding test of larcv image2d passing protocol [done]
 
 ## real applications
 
