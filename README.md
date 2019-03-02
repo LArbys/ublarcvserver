@@ -38,3 +38,45 @@ For MicroBooNE this includes:
 * pytorch ssnet service for sparse convnet
 
 ## additional features
+
+## notes:
+
+last part is to embed python routine responsible for making images
+into the c++ framework.
+
+want user to be able to write a module that looks like the following:
+
+```
+from larcv import larcv
+from ublarcvserver import ublarcvserver
+from ublarcvserver import ublarcvserver.util as util
+import torch
+
+
+model = load_model(...)
+
+def process_net( img_list_bson_str ):
+  """
+  img_list_bson_str is a list of pystrings, with the contents being:
+    ["imgtype",imgdata,"imgtype",imgdata,...]       
+  """
+  global model
+
+  img_v = util.stringlist2img2(img_list_bson_str)
+  img_np = [ larcv.as_ndarray(img_v.at(iimg)) for iimg in xrange(img_v.size()) ]
+
+  ...
+
+  out = model.forward(batch)
+
+  ...
+
+  # convert tensor to image2d to bson list
+
+  return imgout_list_bson_str
+
+```
+
+the goal is to reduce the amount of non-network code the user has to write.
+
+seems doable following something like this [example](https://docs.python.org/2/extending/embedding.html).
