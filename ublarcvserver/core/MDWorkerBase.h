@@ -36,9 +36,8 @@ namespace ublarcvserver {
     bool do_job();
 
     // function user provides to process message
-    virtual MDWorkerMsg_t process_message(const int ninputframes,
-                                          const int nresponses_to_frame,
-                                          char* msg) = 0;
+    virtual MDWorkerMsg_t process_message(const int nresponses_to_message,
+                                          zmsg_t* input_msg) = 0;
 
     //void signalHandler(int sig);
     void destroyWorker();

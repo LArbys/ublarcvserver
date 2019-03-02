@@ -14,6 +14,9 @@
 #pragma link C++ class ublarcvserver::MDBroker+;
 #pragma link C++ class ublarcvserver::DummyClient+;
 #pragma link C++ class ublarcvserver::DummyWorker+;
+#pragma link C++ struct ublarcvserver::LArCVClient::ImgStoreMeta_t;
+#pragma link C++ class ublarcvserver::LArCVClient+;
+#pragma link C++ class ublarcvserver::MirrorWorker+;
 //ADD_NEW_CLASS ... do not change this line
 
 #endif

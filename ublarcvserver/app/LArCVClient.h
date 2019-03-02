@@ -47,18 +47,23 @@ namespace ublarcvserver {
     zmsg_t* make_request_message();
     bool process_reply( zmsg_t* );
 
+  public:
     ImageType_t _imgtype;
     struct ImgStoreMeta_t {
       const larcv::Image2D* img;
       const larcv::Image2D* select;
       float threshold;
       bool isdense;
+      ImgStoreMeta_t()
+       : img(0), select(0), threshold(0), isdense(false) {};
       ImgStoreMeta_t( const larcv::Image2D* fimg,
         const larcv::Image2D* fselect,
         float fthreshold, bool fisdense )
         : img(fimg), select(fselect), threshold(fthreshold), isdense(fisdense)
         {};
     };
+
+  protected:
     std::vector< ImgStoreMeta_t > _images_toworker_v;
     std::vector< larcv::Image2D > _images_received_v;
 

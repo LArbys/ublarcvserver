@@ -17,9 +17,8 @@ namespace ublarcvserver {
 
   protected:
 
-    MDWorkerMsg_t process_message(const int ninputframes,
-                                  const int nresponses_to_frame,
-                                  char* msg);
+    MDWorkerMsg_t process_message(const int nresponses_to_frame,
+                                  zmsg_t* msg);
 
   };
 

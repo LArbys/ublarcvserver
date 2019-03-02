@@ -112,11 +112,11 @@ namespace ublarcvserver {
       }
       else if ( strimgtype=="sparseimg2d") {
         larcv::Image2D img2d=larcv::json::image2d_from_bson_pixelarray(bson);
-         _images_received_v.emplace_back( std::move(img2d) );
-       }
-       else {
-         return false;
-       }
+        _images_received_v.emplace_back( std::move(img2d) );
+      }
+      else {
+        return false;
+      }
 
       // next frame
       img_frame = zmsg_next(msg);

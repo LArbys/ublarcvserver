@@ -143,65 +143,54 @@ namespace ublarcvserver {
     zmsg_t *message;   // message body
     int res = zsock_recv(worker_sock, "fm", &address, &message);
 
-    // now process different parts with partial responses
-    zframe_t *current_frame = zmsg_first(message);
-    int nframes_in   = 0; // number of frames we've read
+    // now process the message
     int npartial_out = 0; // number of messages out
     bool sent_final   = false;
-    while ( current_frame ) {
+    while ( !sent_final ) {
       // loop will stop once, frame_start is nullptr
-      char *frame_message = zframe_strdup(current_frame);
+      //char *frame_message = zframe_strdup(current_frame);
 
       bool done_w_frame = false;
       zmsg_t* msg_response = zmsg_new();
-      int nresponses_to_frame = 0;
       MDWorkerMsg_t response;
-      while ( !done_w_frame ) {
-        // get response to message
-        //std::cout << "call user process_message" << std::endl;
-        response = process_message( nframes_in,
-                                    nresponses_to_frame,
-                                    frame_message );
-        //std::cout << "response: " << response.msg << std::endl;
-        std::cout.flush();
-        zmsg_addstr(msg_response, response.msg.c_str() );
-        nresponses_to_frame++;
-        if ( response.done_with_frame==1 ) {
-          done_w_frame = true;
-          break;
-        }
+
+      // get response to message
+      //std::cout << "call user process_message" << std::endl;
+      response = process_message( npartial_out, message );
+      //std::cout << "response: " << response.msg << std::endl;
+      //std::cout.flush();
+
+      // add reply to message
+      if ( !response.msg ) {
+        // msg not filled, so use string
+        zmsg_addstr(msg_response, response.str_msg.c_str() );
       }
+      else {
+        // msg filled, so use this
+        zmsg_addmsg(msg_response, &(response.msg) );
+      }
+      npartial_out++;
 
       // send the message
       if ( !response.isfinal ) {
-        // not the final chunk, so we send a particle chunk
+        // not the final chunk, so we send a partial chunk
         // Make a copy of address, because mdp_worker_send_partial will free it
         //std::cout << "respond partial." << std::endl;
         zframe_t *address2 = zframe_dup(address);
         mdp_worker_send_partial(_pworker, &address2, &msg_response);
         npartial_out++;
         // go to next frame, or if final.
-        current_frame = zmsg_next(message);
       }
       else {
-        // final, we send final frame_message. spend the last address
+        // final, we send final frame_message. send the last address
         //std::cout << "respond to frame with final msg" << std::endl;
         mdp_worker_send_final( _pworker, &address, &msg_response );
         sent_final = true;
         npartial_out++;
       }
-      nframes_in++;
-      if ( response.isfinal || !current_frame )
-        break;
-    } // end of frame while loop
 
-    if ( !sent_final ) {
-      zmsg_t* msg_response = zmsg_new();
-      char finmsg[50];
-      sprintf( finmsg, "Final auto-response" );
-      zmsg_addstr(msg_response, finmsg);
-      mdp_worker_send_final( _pworker, &address, &msg_response );
-    }
+    } // end of reply loop
+
     zpoller_destroy( &worker_poll );
     return true;
   }//end of do_job
