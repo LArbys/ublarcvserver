@@ -19,6 +19,7 @@ namespace ublarcvserver {
     std::string server_addr, std::string id_name, bool verbose )
   : _service_name(service_name),
     _server_addr(server_addr),
+    _verbose(verbose),
     _pworker(nullptr)
     {
       // create the id name
@@ -49,9 +50,19 @@ namespace ublarcvserver {
     destroyWorker();
   }
 
+  /**
+  *  destroy our connections to the broker
+  *
+  */
   void MDWorkerBase::destroyWorker() {
     if (!_pworker) return;
     //std::cout << "destroy mdp_worker" << std::endl;
+
+    // free poller
+    zpoller_destroy( &_worker_poll );
+    _worker_poll = nullptr;
+    _worker_sock = nullptr;
+
     mdp_worker_destroy(&_pworker);
     _pworker = nullptr;
   }
@@ -62,7 +73,7 @@ namespace ublarcvserver {
   void MDWorkerBase::create(std::string server_addr ) {
     if ( _pworker ) {
       std::stringstream ss;
-      ss << error_prefix()
+      ss << error_prefix(__FUNCTION__)
          << "asked to connect while still connected." << std::endl;
       throw std::runtime_error(ss.str());
     }
@@ -73,11 +84,17 @@ namespace ublarcvserver {
     }
     catch (std::exception& e ) {
       std::stringstream ss;
-      ss << error_prefix()
+      ss << error_prefix(__FUNCTION__)
          << "could not create new mdp_worker_t: " << e.what()
          << std::endl;
       throw std::runtime_error(ss.str());
     }
+
+    //  get socket
+    _worker_sock = mdp_worker_msgpipe(_pworker);
+
+    // make poller for socket
+    _worker_poll = zpoller_new(_worker_sock);
   }
 
   /**
@@ -85,10 +102,10 @@ namespace ublarcvserver {
   *
   * returns function name, file, line number
   */
-  std::string MDWorkerBase::error_prefix() const {
+  std::string MDWorkerBase::error_prefix(std::string func) const {
     std::stringstream ss;
-    ss << __FUNCTION__ << ":" << __FILE__ << ":" << __LINE__
-         << "MDWorker[" << _id_name << "] :: ";
+    ss << "MDWorkerBase" << "::" << func << ":L" << __LINE__
+         << ":ID[" << _id_name << "] :: ";
     return ss.str();
   }
 
@@ -106,29 +123,52 @@ namespace ublarcvserver {
     }
   }
 
-  bool MDWorkerBase::do_job() {
-    // get socket for worker
-    zsock_t *worker_sock = mdp_worker_msgpipe(_pworker);
-    const char* socket_type = zsock_type_str( worker_sock );
-    //std::cout << "Worker socket type: " << socket_type << std::endl;
+  /**
+  * perform one poll of the socket to the broker
+  *
+  * @param[in] timeout_secs time of timeout in seconds
+  * @return true if socket found, false if timed out
+  *
+  */
+  bool MDWorkerBase::pollSocket( float timeout_secs ) {
+    int timeout_msecs = (int)(timeout_secs*1000);
+    _pollin_socket = (zsock_t*)zpoller_wait(_worker_poll, timeout_msecs);
 
-    // get a poller for the socket type
-    zpoller_t* worker_poll = zpoller_new(worker_sock);
 
-    // start a poll
-    zsock_t* pollin_socket = (zsock_t*)zpoller_wait(worker_poll, 1*1000);
-    if ( zpoller_expired(worker_poll) ) {
+    if ( zpoller_expired(_worker_poll) ) {
       // poller ends due to time-out. exit this loop.
+      if ( _verbose ) {
+        std::cout << error_prefix(__FUNCTION__)
+                  << "poller expired. "
+                  << "timeout=" << timeout_msecs << "msecs" << std::endl;
+      }
       return false;
     }
-    //std::cout << "poller found input command" << std::endl;
+    if (_verbose ) {
+      std::cout << error_prefix(__FUNCTION__)
+                << "pollin socket found input: " << _pollin_socket
+                << " timeout=" << timeout_msecs << std::endl;
+    }
+
+    return true;
+  }
+
+  bool MDWorkerBase::do_job() {
+
+    // poll broker socket
+    bool has_pollin = pollSocket(10.0);
+    if ( !has_pollin )
+      return false;
 
     // if got an input, keep going
 
     // get request from the broker
+    if (_verbose )
+      std::cout << error_prefix(__FUNCTION__)
+                << "get broker command (blocking)" << std::endl;
     char* cmd = nullptr;
     try {
-      cmd = zstr_recv(worker_sock);
+      cmd = zstr_recv(_worker_sock);
       //std::cout << "Got command from client: " << std::string(cmd) << std::endl;
     }
     catch (std::exception& e) {
@@ -137,11 +177,13 @@ namespace ublarcvserver {
          << ": error tryting to get job: " << e.what() << std::endl;
       throw std::runtime_error(ss.str());
     }
+    if ( _verbose )
+      std::cout << error_prefix(__FUNCTION__) << "broker message: " << cmd << std::endl;
 
     // get the start of the message: expect "frame,message" format
     zframe_t *address; // frame
     zmsg_t *message;   // message body
-    int res = zsock_recv(worker_sock, "fm", &address, &message);
+    int res = zsock_recv(_worker_sock, "fm", &address, &message);
 
     // now process the message
     int npartial_out = 0; // number of messages out
@@ -199,9 +241,33 @@ namespace ublarcvserver {
 
     } // end of reply loop
 
-    zpoller_destroy( &worker_poll );
+
     return true;
   }//end of do_job
+
+  /**
+  * get broker command
+  *
+  */
+  std::string MDWorkerBase::getBrokerCommand() {
+    char* cmd = zstr_recv(_worker_sock);
+    std::string scmd = cmd;
+    free(cmd);
+    return scmd;
+  }
+
+  MDWorkerMsg_t MDWorkerBase::process_message(
+    const int nresponses_to_message, zmsg_t* input_msg)
+  {
+    std::stringstream ss;
+    ss << error_prefix(__FUNCTION__)
+       << ": should be overridden by child class"
+       << std::endl;
+    throw std::runtime_error(ss.str());
+    MDWorkerMsg_t out;
+    return out;
+  }
+
 
 
 }

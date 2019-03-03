@@ -11,6 +11,9 @@
 
 // Classes
 #pragma link C++ namespace ublarcvserver+;
+#pragma link C++ namespace ublarcvserver::zmqutil+;
+//#pragma link C++ struct zframe_t;
+#pragma link C++ struct ublarcvserver::zmqutil::zmsg_t;
 #pragma link C++ struct ublarcvserver::MDWorkerMsg_t+;
 #pragma link C++ class ublarcvserver::MDWorkerBase+;
 #pragma link C++ class ublarcvserver::MDClientBase+;
