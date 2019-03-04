@@ -16,3 +16,7 @@ for l in [x for x in os.listdir(ublarcvserver_dir) if x.endswith('.so')]:
     ROOT.gSystem.Load(l)
 
 from ROOT import ublarcvserver
+from mdpyworkerbase import MDPyWorkerBase as MDPyWorkerBase
+from DummyPyWorker import DummyPyWorker as DummyPyWorker
+from broker import Broker as Broker
+from client import Client as Client

@@ -27,7 +27,9 @@ namespace ublarcvserver {
     // starts worker loop
     void run();
     static void set_signal() { _signaled=1; };
-
+    // wait for message
+    bool pollSocket( float timeout_secs );
+    
   protected:
 
     void create(std::string server_addr);
@@ -41,9 +43,6 @@ namespace ublarcvserver {
 
     //void signalHandler(int sig);
     void destroyWorker();
-
-    // wait for message
-    bool pollSocket( float timeout_secs );
 
     // get broker command
     std::string getBrokerCommand();
