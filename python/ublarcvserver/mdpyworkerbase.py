@@ -1,13 +1,10 @@
 import zmq
 import time, abc, logging
-import ROOT
-import protocol as p
-from ROOT import ublarcvserver
+import majortomo.protocol as p
 
 class MDPyWorkerBase(object):
     __metaclass__ = abc.ABCMeta
     _ninstances = 0
-
 
     def __init__(self, service_name, broker_address,
                     zmq_context=None, id_name=None, verbose=False,
