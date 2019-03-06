@@ -32,7 +32,8 @@ class Client(object):
     :ivar _socket: zmq.Socket
     :type _socket: zmq.Socket
     """
-    def __init__(self, broker_url, zmq_context=None, zmq_linger=DEFAULT_ZMQ_LINGER):
+    def __init__(self, broker_url,
+                 zmq_context=None, zmq_linger=DEFAULT_ZMQ_LINGER):
         # type: (str, Optional[zmq.Context], int) -> None
         self.broker_url = broker_url
         self._socket = None  # type: zmq.Socket

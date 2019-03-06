@@ -37,9 +37,14 @@ class MDPyWorkerBase(object):
     # ABSTRACT METHODS
     # -------------------------------------------------------------
     @abc.abstractmethod
-    def make_reply(self,request):
+    def make_reply(self,request,nreplies):
         """ user should implement this. recieve multipart message and return
-            multipart message"""
+            multipart message
+
+            request: list of message frames
+            nreplies: number of times we've called this function. used to
+                        track which partial message to send
+        """
         raise RuntimeError("should not get here")
 
     # PUBLIC METHODS
@@ -107,33 +112,37 @@ class MDPyWorkerBase(object):
     def send_reply_final(self, client, frames):
         # type: (bytes, List[bytes]) -> None
         """Send final reply to client
-        FINAL reply means the client will not expect any additional parts to the reply. This should be used
-        when the entire reply is ready to be delivered.
+        FINAL reply means the client will not expect any additional parts to
+        the reply. This should be used when the entire reply is ready
+        to be delivered.
         """
         self._send_to_client(client, p.FINAL, *frames)
 
     def send_reply_partial(self, client, frames):
         # type: (bytes, List[bytes]) -> None
         """Send the given set of frames as a partial reply to client
-        PARTIAL reply means the client will expect zero or more additional PARTIAL reply messages following
-        this one, with exactly one terminating FINAL reply following. This should be used if parts of the
-        reply are ready to be sent, and the client is capable of processing them while the worker is still
-        at work on the rest of the reply.
+        PARTIAL reply means the client will expect zero or more additional
+        PARTIAL reply messages following this one, with exactly one terminating
+        FINAL reply following. This should be used if parts of the reply are
+        ready to be sent, and the client is capable of processing them while
+        the worker is still at work on the rest of the reply.
         """
         self._send_to_client(client, p.PARTIAL, *frames)
 
     def run(self):
-        """ loops until we get a disconnect signal from the broker. Or
-            until an error occurs"""
+        """ loops until we get a disconnect signal from the broker.
+        Or until an error occurs
+        """
         while True:
             client_addr, request = self.wait_for_request()
             if client_addr is None:
                 break
 
             isfinal = False
+            nreplies = 0
             while not isfinal:
                 # use the user function
-                reply, isfinal = self.make_reply(request)
+                reply, isfinal = self.make_reply(request, nreplies)
                 if not isfinal:
                     self.send_reply_partial(client_addr,reply)
                 else:
@@ -175,7 +184,7 @@ class MDPyWorkerBase(object):
         """Return the poll timeout for the current iteration in milliseconds
         """
         interval = int((time.time() - \
-                        self._last_sent_message+self._heartbeat_interval) * 1000)
+                        self._last_sent_message+self._heartbeat_interval)*1000)
         return max(0,interval)
 
     @staticmethod

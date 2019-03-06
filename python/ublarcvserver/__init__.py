@@ -9,6 +9,7 @@ if not 'LARCV_BASEDIR' in os.environ:
 
 # must load dependencies first
 from larcv import larcv
+larcv.load_pyutil()
 
 ublarcvserver_dir = os.environ['UBLARCVSERVER_LIBDIR']
 # We need to load in order
