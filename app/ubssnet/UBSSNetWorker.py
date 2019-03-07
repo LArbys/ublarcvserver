@@ -1,6 +1,8 @@
 import os,sys,logging
-
+import numpy as np
+from larcv import larcv
 from ublarcvserver import MDPyWorkerBase, Broker, Client
+larcv.json.load_jsonutils()
 
 """
 Implements worker for ubssnet
@@ -63,7 +65,7 @@ class UBSSNetWorker(MDPyWorkerBase):
             raise ValueError("invalid device name [{}]. Must str with name \
                                 \"cpu\" or \"cuda:X\" where X=device number")
 
-        self._log = logging.getLogger(__name__)
+        self._log = logging.getLogger(self.idname())
 
         self.device = torch.device(device)
         self.model = ubSSNet(weight_file).to(self.device)
@@ -82,6 +84,11 @@ class UBSSNetWorker(MDPyWorkerBase):
         if not self.is_model_loaded():
             self._log.debug("model not loaded for some reason. loading.")
 
+        try:
+            import torch
+        except:
+            raise RuntimeError("could not load pytorch!")
+
         # message pattern: [image_bson,image_bson,...]
 
         nmsgs = len(request)
@@ -93,12 +100,13 @@ class UBSSNetWorker(MDPyWorkerBase):
         # turn message pieces into numpy arrays
         img2d_v  = []
         sizes    = []
+        frames_used = []
         for imsg in xrange(self._next_msg_id,nmsgs):
             try:
                 img2d = larcv.json.image2d_from_pystring( str(request[imsg]) )
             except:
                 self._log.error("Image Data in message part {}\
-                                could not be converted".format(nreplies))
+                                could not be converted".format(imsg))
                 continue
             self._log.debug("Image[{}] converted: {}"\
                             .format(imsg,img2d.meta().dump()))
@@ -109,22 +117,26 @@ class UBSSNetWorker(MDPyWorkerBase):
                 continue
 
             # check that same size as previous images
-            imgsize = (img2d.meta().cols(),img2d.meta().rows)
+            imgsize = (int(img2d.meta().cols()),int(img2d.meta().rows()))
             if len(sizes)==0:
                 sizes.append(imgsize)
             elif len(sizes)>0 and imgsize not in sizes:
                 self._log.debug("Next image a different size. \
                                     we do not continue batch.")
-                self._next_msg_id = imsg+1
+                self._next_msg_id = imsg
                 break
             img2d_v.append(img2d)
+            frames_used.append(imsg)
             if len(img2d_v)>=self.batch_size:
                 self._next_msg_id = imsg+1
                 break
 
 
         # convert the images into numpy arrays
-        img_batch_np = np.zeros( (len(img2d_v),1,sizes[0][0],sizes[0][1]),\
+        nimgs = len(img2d_v)
+        self._log.debug("converted msgs into batch of {} images. frames={}"
+                        .format(nimgs,frames_used))
+        img_batch_np = np.zeros( (nimgs,1,sizes[0][0],sizes[0][1]),
                                     dtype=np.float32 )
 
         for iimg,img2d in enumerate(img2d_v):
@@ -135,23 +147,29 @@ class UBSSNetWorker(MDPyWorkerBase):
 
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
-        out_batch_np = self.model(img2d_batch_t).detach().numpy()
-
+        out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
+        self._log.debug("passed images through net. output batch shape={}"
+                        .format(out_batch_np.shape))
         # convert from numpy array batch back to image2d and messages
         reply = []
-        for out_np,img2d in zip(out_batch_np,img2d_v):
-            meta = img2d.meta()
-            out_img2d = larcv.as_image2d_meta( out_np, meta )
-            bson = larcv.json.as_pystring( out_img2d )
-            reply.append(bson)
+        for iimg in xrange(out_batch_np.shape[0]):
+            img2d = img2d_v[iimg]
+            meta  = img2d.meta()
+            for ich in xrange(out_batch_np.shape[1]):
+                out_np = out_batch_np[iimg,ich,:,:]
+                out_img2d = larcv.as_image2d_meta( out_np, meta )
+                bson = larcv.json.as_pystring( out_img2d )
+                reply.append(bson)
 
-        if self._next_msg_id>=nreplies:
+        if self._next_msg_id>=nmsgs:
             isfinal = True
             self._still_processing_msg = False
         else:
             isfinal = False
             self._still_processing_msg = True
 
+        self._log.debug("formed reply with {} frames. isfinal={}"
+                        .format(len(reply),isfinal))
         return reply,isfinal
 
     def is_model_loaded(self):
