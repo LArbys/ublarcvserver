@@ -1,5 +1,6 @@
 import os,sys,time,logging
-from start_broker_worker import startup_broker_and_workers
+from ublarcvserver import start_broker
+from start_ubssnet_worker import startup_ubssnet_workers
 from UBSSNetClient import UBSSNetClient
 
 if __name__ == "__main__":
@@ -17,8 +18,10 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.DEBUG)
 
-    pbroker, pworkers = startup_broker_and_workers(endpoint,bindpoint,
-                                                    weights_files,nplanes=[2])
+    pbroker = start_broker(bindpoint)
+    pworkers = startup_ubssnet_workers(endpoint,weights_files,
+                                        devices="cuda",nplanes=[2],
+                                        batch_size=4)
 
 
     client = UBSSNetClient(endpoint,larcv_supera_file,"wire",

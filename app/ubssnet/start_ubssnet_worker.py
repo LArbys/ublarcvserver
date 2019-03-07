@@ -1,6 +1,5 @@
 import os,sys,logging
 from multiprocessing import Process
-
 from UBSSNetWorker import UBSSNetWorker
 from ublarcvserver import Broker
 
@@ -9,40 +8,42 @@ Start the broker and worker. Run one client. Useful for tests.
 """
 
 def start_ubssnet_worker(broker_address,plane,weight_file,device,batch_size):
+    print batch_size,type(batch_size)
     worker=UBSSNetWorker(broker_address,plane,weight_file,device,batch_size)
     worker.connect()
     print "worker started: ",worker.idname()
     worker.run()
 
-def start_ubssnet_broker(bindpoint):
-    print "start broker"
-    broker = Broker(bind=bindpoint)
-    broker.run()
-    print "broker closed"
 
-
-def startup_broker_and_workers( broker_address, broker_bindpoint,
-                                weights_files, batch_size=1,
-                                nplanes=[0,1,2]):
-
-    logging.basicConfig(level=logging.DEBUG)
-    pbroker = Process(target=start_ubssnet_broker,
-                      args=(broker_bindpoint,))
-    pbroker.daemon = True
-    pbroker.start()
+def startup_ubssnet_workers( broker_address, weights_files,
+                             devices=["cuda","cuda","cuda"],
+                             batch_size=1,
+                             nplanes=[0,1,2]):
+    if type(devices) is str:
+        devices = len(nplanes)*[devices]
+    if len(devices)>len(nplanes):
+        devices = [devices[x] for x in xrange(len(nplanes))]
+    elif len(devices)<len(nplanes):
+        raise ValueError("devices need to be speficied for each plane")
 
     # setup the worker
     pworkers = []
-    for p in nplanes:
+    print "plans: ",nplanes
+    print "devices: ",devices
+    for p,device in zip(nplanes,devices):
         pworker = Process(target=start_ubssnet_worker,
-                          args=(broker_address,p,weights_files[p],"cuda",batch_size))
+                          args=(broker_address,p,weights_files[p],
+                                device,batch_size,))
         pworker.daemon = True
         pworkers.append(pworker)
 
     for pworker in pworkers:
         pworker.start()
 
-    return pbroker, pworkers
+    return pworkers
+
+
+
 
 if __name__ == "__main__":
 
@@ -54,8 +55,8 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.DEBUG)
 
-    pbroker, pworkers = startup_broker_and_workers(endpoint,bindpoint,
-                                                    weights_files,nplanes=[2])
+    pbroker = start_broker(bindpoint)
+    pworkers = startup_ubssnet_workers(endpoint,weights_files,nplanes=[2])
 
     print "[ENTER] to quit."
     raw_input()
