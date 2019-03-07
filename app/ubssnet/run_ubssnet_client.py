@@ -9,7 +9,9 @@ if __name__ == "__main__":
     endpoint  = "tcp://localhost:6005"
     bindpoint = "tcp://*:6005"
     weights_dir = "/home/twongjirad/working/nutufts/pytorch-uresnet/weights/"
-    weights_files = {2:weights_dir+"/saved_caffe_weights_plane2.tar"}
+    weights_files = {0:weights_dir+"/mcc8_caffe_ubssnet_plane0.tar",
+                     1:weights_dir+"/mcc8_caffe_ubssnet_plane1.tar",
+                     2:weights_dir+"/mcc8_caffe_ubssnet_plane2.tar"}
 
     input_dir = "/home/twongjirad/working/larbys/ubdl/testdata/ex1"
     larcv_supera_file   = input_dir+"/supera-Run000001-SubRun006867.root"
@@ -20,9 +22,8 @@ if __name__ == "__main__":
 
     pbroker = start_broker(bindpoint)
     pworkers = startup_ubssnet_workers(endpoint,weights_files,
-                                        devices="cuda",nplanes=[2],
-                                        batch_size=4)
-
+                                        devices="cuda",nplanes=[0,1,2],
+                                        batch_size=1)
 
     client = UBSSNetClient(endpoint,larcv_supera_file,"wire",
                             output_larcv_filename,

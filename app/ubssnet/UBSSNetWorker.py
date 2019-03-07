@@ -1,4 +1,4 @@
-import os,sys,logging
+import os,sys,logging, zlib
 import numpy as np
 from larcv import larcv
 from ublarcvserver import MDPyWorkerBase, Broker, Client
@@ -68,7 +68,7 @@ class UBSSNetWorker(MDPyWorkerBase):
         self._log = logging.getLogger(self.idname())
 
         self.device = torch.device(device)
-        self.model = ubSSNet(weight_file).to(self.device)
+        self.model = ubSSNet(weight_file).half().to(self.device)
         self.model.eval()
 
 
@@ -103,7 +103,10 @@ class UBSSNetWorker(MDPyWorkerBase):
         frames_used = []
         for imsg in xrange(self._next_msg_id,nmsgs):
             try:
-                img2d = larcv.json.image2d_from_pystring( str(request[imsg]) )
+                compressed_data = str(request[imsg])
+                data = zlib.decompress(compressed_data)
+
+                img2d = larcv.json.image2d_from_pystring( data )
             except:
                 self._log.error("Image Data in message part {}\
                                 could not be converted".format(imsg))
@@ -148,6 +151,22 @@ class UBSSNetWorker(MDPyWorkerBase):
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
         out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
+
+        # remove background values
+        out_batch_np = out_batch_np[:,1:,:,:]
+
+        # compression techniques
+        ## 1) threshold values to zero
+        ## 2) suppress output for non-adc values
+        ## 3) use half
+
+        # suppress small values
+        out_batch_np[ out_batch_np<1.0e-3 ] = 0.0
+
+        # threshold
+        for ich in xrange(out_batch_np.shape[1]):
+            out_batch_np[:,ich,:,:][ img_batch_np[:,0,:,:]<10.0 ] = 0.0
+
         self._log.debug("passed images through net. output batch shape={}"
                         .format(out_batch_np.shape))
         # convert from numpy array batch back to image2d and messages
@@ -159,7 +178,8 @@ class UBSSNetWorker(MDPyWorkerBase):
                 out_np = out_batch_np[iimg,ich,:,:]
                 out_img2d = larcv.as_image2d_meta( out_np, meta )
                 bson = larcv.json.as_pystring( out_img2d )
-                reply.append(bson)
+                compressed = zlib.compress(bson)
+                reply.append(compressed)
 
         if self._next_msg_id>=nmsgs:
             isfinal = True

@@ -3,6 +3,7 @@ from ublarcvserver import Client
 from larlite import larlite
 from larcv import larcv
 from ublarcvapp import ublarcvapp
+import zlib
 
 #larcv.load_pyutils()
 larcv.json.load_jsonutils()
@@ -125,12 +126,16 @@ class UBSSNetClient(Client):
         planes.sort()
         self._log.debug("sending images from {} planes.".format(planes))
         imgout_v = {}
+        nsize_uncompressed = 0
+        nsize_compressed = 0
+        received_compressed = 0
+        received_uncompressed = 0
         for p in planes:
             if p not in imgout_v:
                 imgout_v[p] = []
 
-            if p not in [2]:
-                continue
+            #if p not in [2]:
+            #    continue
 
 
             self._log.debug("images in plane[{}]: {}."
@@ -141,7 +146,10 @@ class UBSSNetClient(Client):
             for img2d in img2d_list[p]:
                 print img2d
                 bson = larcv.json.as_pystring(img2d)
-                msg.append(bson)
+                nsize_uncompressed += len(bson)
+                compressed = zlib.compress(bson)
+                nsize_compressed   += len(compressed)
+                msg.append(compressed)
             self.send("ubssnet_plane%d"%(p),*msg)
 
             # receives
@@ -156,16 +164,23 @@ class UBSSNetClient(Client):
                                 .format(len(workerout)))
                 # use the time worker is preparing next part, to convert image
                 for reply in workerout:
-                    replyimg = larcv.json.image2d_from_pystring(str(reply))
+                    data = str(reply)
+                    received_compressed += len(data)
+                    data = zlib.decompress(data)
+                    received_uncompressed += len(data)
+                    replyimg = larcv.json.image2d_from_pystring(data)
                     imgout_v[p].append(replyimg)
                     self._log.debug("total converted plane[{}] images: {}"
                                     .format(p,len(imgout_v[p])))
 
-            # should be a multiple of 3 (track,shower,bg)
-            if len(imgout_v[p])>0 and len(imgout_v[p])%3!=0:
+            # should be a multiple of 2: (shower,track)
+            if len(imgout_v[p])>0 and len(imgout_v[p])%2!=0:
                 raise RuntimeError(\
                     "Did not receive complete set for all images")
-
+        self._log.debug("Total sent size. uncompressed=%.2f MB compreseed=%.2f"\
+                        %(nsize_uncompressed/1.0e6,nsize_compressed/1.0e6))
+        self._log.debug("Total received. compressed=%.2f uncompressed=%.2f MB"\
+                        %(received_compressed/1.0e6, received_uncompressed/1.0e6))
         return imgout_v
 
     def process_received_images(self, wholeview_v, outimg_v):
@@ -176,30 +191,30 @@ class UBSSNetClient(Client):
                         get_data(larcv.kProductImage2D,"ssnet_shower")
         ev_track  = self._outlarcv.\
                         get_data(larcv.kProductImage2D,"ssnet_track")
-        ev_bg     = self._outlarcv.\
-                        get_data(larcv.kProductImage2D,"ssnet_background")
+        #ev_bg     = self._outlarcv.\
+        #                get_data(larcv.kProductImage2D,"ssnet_background")
 
         for p in xrange(nplanes):
 
             showerimg = larcv.Image2D( wholeview_v.at(p).meta() )
-            bgimg     = larcv.Image2D( wholeview_v.at(p).meta() )
+            #bgimg     = larcv.Image2D( wholeview_v.at(p).meta() )
             trackimg  = larcv.Image2D( wholeview_v.at(p).meta() )
             showerimg.paint(0)
-            bgimg.paint(0)
+            #bgimg.paint(0)
             trackimg.paint(0)
 
-            nimgsets = len(outimg_v[p])/3
+            nimgsets = len(outimg_v[p])/2
             for iimgset in xrange(nimgsets):
-                bg  = outimg_v[p][iimgset*3+0]
-                shr = outimg_v[p][iimgset*3+1]
-                trk = outimg_v[p][iimgset*3+2]
+                #bg  = outimg_v[p][iimgset*3+0]
+                shr = outimg_v[p][iimgset*2+0]
+                trk = outimg_v[p][iimgset*2+1]
 
                 showerimg.overlay(shr,larcv.Image2D.kOverWrite)
                 trackimg.overlay( trk,larcv.Image2D.kOverWrite)
-                bgimg.overlay(    bg, larcv.Image2D.kOverWrite)
+                #bgimg.overlay(    bg, larcv.Image2D.kOverWrite)
             ev_shower.Append(showerimg)
             ev_track.Append(trackimg)
-            ev_bg.Append(bgimg)
+            #ev_bg.Append(bgimg)
 
     def finalize(self):
         self._inlarcv.finalize()
