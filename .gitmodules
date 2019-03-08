@@ -1,0 +1,3 @@
+[submodule "networks/pytorch-uresnet"]
+	path = networks/pytorch-uresnet
+	url = https://github.com/nutufts/pytorch-uresnet
