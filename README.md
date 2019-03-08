@@ -6,45 +6,43 @@ through deep neural networks using remote GPU workers.
 We build this using the [MajorDomo project](https://github.com/zeromq/majordomo) which is a
 "service-oriented broker" that allows workers providing different services.
 This is useful when we want to process several types of neural networks.
-For MicroBooNE this includes:
 
-* semantic segmentation
-* larflow
-* infill
-* flash-level clustering
-* individual particle level clustering of neutrino candidate cluster
+This solution uses, [majortomo](https://github.com/shoppimon/majortomo),
+a purely python implementation of the MajorDomo protocol.
+
+Majortomo is (C) Copyright 2018 Shoppimon LTD and
+distributed under the terms of the Apache 2.0 License (see LICENSE).
+
+## Applications to be supported
+
+For MicroBooNE this code is to handle:
+
+* ubSSNet (in `app/ubssnet`): track/shower semantic segmentation
+  trained using caffe+MCC8 particle gun data
+* larflow (to do)
+* infill (to do)
+* flash-level clustering (to do)
+* individual particle level clustering of neutrino candidate cluster (to do)
+
+# Instructions
+
+To do
 
 # To Do List
 
-## for minimal working setup
+* instructions
+* basic/generic torch-script worker and larcv client
+* better compression (mostly about how one does the image2d -> bson conversion)
+* submodules to network repos
+* container support and tufts cluster scripts
 
-* broker class [done]
-* worker class base [done]
-* worker class dummy [done]
-* client class base [done]
-* worker class larcv image passing [done]
-* worker class larcv image passing base [done]
-* worker class larcv image + network processing
 
-## test setup
 
-* python binding test of simple dummy client and broker [done]
-* python binding test of larcv image2d passing protocol [done]
+# Misc notes:
 
-## real applications
+## goals for easy-to-use, generic application
 
-* caffe (from python) ssnet service (translation of existing ssnetserver)
-* pytorch ssnet service using torch script
-* pytorch ssnet service for sparse convnet
-
-## additional features
-
-## notes:
-
-last part is to embed python routine responsible for making images
-into the c++ framework.
-
-want user to be able to write a module that looks like the following:
+for generic application, want user to be able to write a module that looks like the following:
 
 ```
 from larcv import larcv
@@ -78,5 +76,3 @@ def process_net( img_list_bson_str ):
 ```
 
 the goal is to reduce the amount of non-network code the user has to write.
-
-seems doable following something like this [example](https://docs.python.org/2/extending/embedding.html).
