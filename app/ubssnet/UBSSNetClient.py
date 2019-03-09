@@ -33,6 +33,7 @@ class UBSSNetClient(Client):
             self._inlarlite = LArliteManager(larlite.storage_manager.kREAD)
             self._inlarlite.add_in_filename(larlite_opreco_file)
             self._inlarlite.open()
+            self._inlarlite.set_verbosity(0)
 
         self._outlarcv = larcv.IOManager(larcv.IOManager.kWRITE)
         self._outlarcv.set_out_file(output_larcv_filename)
@@ -50,6 +51,12 @@ class UBSSNetClient(Client):
         else:
             self._ubsplitdet = None
 
+    def get_entries(self):
+        return self._inlarcv.get_n_entries()
+
+    def __len__(self):
+        return self.get_entries()
+
     def process_entry(self,entry_num):
         """ perform all actions -- send, receive, process, store -- for entry"""
 
@@ -58,10 +65,18 @@ class UBSSNetClient(Client):
         if not ok:
             raise RuntimeError("could not read larcv entry %d"%(entry_num))
 
+        # get data
+        ev_wholeview = self._inlarcv.get_data(larcv.kProductImage2D,"wire")
+        wholeview_v = ev_wholeview.Image2DArray()
+        nplanes = wholeview_v.size()
+        print "number of planes in entry: ",nplanes
+
         # define the roi_v images
         roi_v = []
         if self._inlarlite and self._apply_opflash_roi:
             # use the intime flash to look for a CROI
+            # note, need to get data from larcv first else won't sync properly
+            # this is weird behavior by larcv that I need to fix
             self._inlarlite.syncEntry(self._inlarcv)
             ev_opflash = self._inlarlite.get_data(larlite.data.kOpFlash,
                                                     "simpleFlashBeam")
@@ -80,11 +95,7 @@ class UBSSNetClient(Client):
             # we split the entire image
             raise RuntimeError("Use of ubsplitdet for image not implemented")
 
-        ev_wholeview = self._inlarcv.get_data(larcv.kProductImage2D,"wire")
-        wholeview_v = ev_wholeview.Image2DArray()
-        nplanes = wholeview_v.size()
 
-        print "number of planes: ",nplanes
 
         # make crops from the roi_v
         img2d_v = {}
@@ -118,6 +129,7 @@ class UBSSNetClient(Client):
                                self._inlarcv.event_id().event())
 
         self._outlarcv.save_entry()
+        return True
 
 
     def send_image_list(self,img2d_list):
@@ -144,7 +156,6 @@ class UBSSNetClient(Client):
             # send image
             msg = []
             for img2d in img2d_list[p]:
-                print img2d
                 bson = larcv.json.as_pystring(img2d)
                 nsize_uncompressed += len(bson)
                 compressed = zlib.compress(bson)
@@ -215,6 +226,10 @@ class UBSSNetClient(Client):
             ev_shower.Append(showerimg)
             ev_track.Append(trackimg)
             #ev_bg.Append(bgimg)
+
+    def process_entries(self):
+        for ientry in xrange(self.get_entries()):
+            self.process_entry(ientry)
 
     def finalize(self):
         self._inlarcv.finalize()
