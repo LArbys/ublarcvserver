@@ -1,7 +1,7 @@
 import os,sys,logging, zlib
 import numpy as np
 from larcv import larcv
-from c_types import c_int
+from ctypes import c_int
 from ublarcvserver import MDPyWorkerBase, Broker, Client
 larcv.json.load_jsonutils()
 
