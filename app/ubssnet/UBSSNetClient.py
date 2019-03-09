@@ -200,7 +200,7 @@ class UBSSNetClient(Client):
                                 c_run, c_subrun, c_event, c_id )
                         #byref(c_run),byref(c_subrun),byref(c_event),byref(c_id))
                     rep_rse = (c_run.value,c_subrun.value,
-                                c_event.value,c_id.value)
+                                c_event.value)
                     self._log.debug("rec images with rse={}".format(rep_rse))
                     if rep_rse!=rse:
                         self._log.warning("image with wronge rse={}. ignoring."
