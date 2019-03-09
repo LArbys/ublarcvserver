@@ -12,6 +12,7 @@ class UBSSNetWorker(MDPyWorkerBase):
 
     def __init__(self,broker_address,plane,
                 weight_file,device,batch_size,
+                 use_half=False,
                 **kwargs):
         """
         Constructor
@@ -37,17 +38,18 @@ class UBSSNetWorker(MDPyWorkerBase):
         self.plane = plane
         self.batch_size = batch_size
         self._still_processing_msg = False
+        self._use_half = use_half
         service_name = "ubssnet_plane%d"%(self.plane)
 
         super(UBSSNetWorker,self).__init__( service_name,
                                             broker_address, **kwargs)
 
-        self.load_model(weight_file,device)
+        self.load_model(weight_file,device,self._use_half)
         if self.is_model_loaded():
             self._log.info("Loaded ubSSNet model. Service={}"\
                             .format(service_name))
 
-    def load_model(self,weight_file,device):
+    def load_model(self,weight_file,device,use_half):
         # import pytorch
         try:
             import torch
@@ -68,7 +70,10 @@ class UBSSNetWorker(MDPyWorkerBase):
         self._log = logging.getLogger(self.idname())
 
         self.device = torch.device(device)
-        self.model = ubSSNet(weight_file).half().to(self.device)
+        if not self._use_half:
+            self.model = ubSSNet(weight_file).to(self.device)
+        else:
+            self.model = ubSSNet(weight_file).half().to(self.device)
         self.model.eval()
 
 
@@ -139,14 +144,20 @@ class UBSSNetWorker(MDPyWorkerBase):
         nimgs = len(img2d_v)
         self._log.debug("converted msgs into batch of {} images. frames={}"
                         .format(nimgs,frames_used))
+        np_dtype = np.float32
+        if self._use_half:
+            np_dtype = np.float16
         img_batch_np = np.zeros( (nimgs,1,sizes[0][0],sizes[0][1]),
-                                    dtype=np.float32 )
+                                    dtype=np_dtype )
 
         for iimg,img2d in enumerate(img2d_v):
             meta = img2d.meta()
             img2d_np = larcv.as_ndarray( img2d )\
                             .reshape( (1,1,meta.cols(),meta.rows()))
-            img_batch_np[iimg,:] = img2d_np
+            if not self._use_half:
+                img_batch_np[iimg,:] = img2d_np
+            else:
+                img_batch_np[iimg,:] = img2d_np.as_type(np.float16)
 
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
@@ -166,6 +177,11 @@ class UBSSNetWorker(MDPyWorkerBase):
         # threshold
         for ich in xrange(out_batch_np.shape[1]):
             out_batch_np[:,ich,:,:][ img_batch_np[:,0,:,:]<10.0 ] = 0.0
+
+        # convert back to full precision, if we used half-precision in the net
+        if self._use_half:
+            out_batch_np = out_batch_np.as_type(np.float32)        
+            
 
         self._log.debug("passed images through net. output batch shape={}"
                         .format(out_batch_np.shape))
