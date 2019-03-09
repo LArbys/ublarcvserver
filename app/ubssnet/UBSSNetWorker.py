@@ -1,6 +1,7 @@
 import os,sys,logging, zlib
 import numpy as np
 from larcv import larcv
+from c_types import c_int
 from ublarcvserver import MDPyWorkerBase, Broker, Client
 larcv.json.load_jsonutils()
 
@@ -106,12 +107,17 @@ class UBSSNetWorker(MDPyWorkerBase):
         img2d_v  = []
         sizes    = []
         frames_used = []
+        rseid_v = []
         for imsg in xrange(self._next_msg_id,nmsgs):
             try:
                 compressed_data = str(request[imsg])
                 data = zlib.decompress(compressed_data)
-
-                img2d = larcv.json.image2d_from_pystring( data )
+                c_run = c_int()
+                c_subrun = c_int()
+                c_event = c_int()
+                c_id = c_int()
+                img2d = larcv.json.image2d_from_pystring(data,
+                                        c_run, c_subrun, c_event, c_id )
             except:
                 self._log.error("Image Data in message part {}\
                                 could not be converted".format(imsg))
@@ -135,6 +141,7 @@ class UBSSNetWorker(MDPyWorkerBase):
                 break
             img2d_v.append(img2d)
             frames_used.append(imsg)
+            rseid_v.append((c_run.value,c_subrun.value,c_event.value,c_id.value))
             if len(img2d_v)>=self.batch_size:
                 self._next_msg_id = imsg+1
                 break
@@ -180,8 +187,8 @@ class UBSSNetWorker(MDPyWorkerBase):
 
         # convert back to full precision, if we used half-precision in the net
         if self._use_half:
-            out_batch_np = out_batch_np.as_type(np.float32)        
-            
+            out_batch_np = out_batch_np.as_type(np.float32)
+
 
         self._log.debug("passed images through net. output batch shape={}"
                         .format(out_batch_np.shape))
@@ -189,11 +196,13 @@ class UBSSNetWorker(MDPyWorkerBase):
         reply = []
         for iimg in xrange(out_batch_np.shape[0]):
             img2d = img2d_v[iimg]
+            rseid = rseid_v[iimg]
             meta  = img2d.meta()
             for ich in xrange(out_batch_np.shape[1]):
                 out_np = out_batch_np[iimg,ich,:,:]
                 out_img2d = larcv.as_image2d_meta( out_np, meta )
-                bson = larcv.json.as_pystring( out_img2d )
+                bson = larcv.json.as_pystring( out_img2d,
+                                    rseid[0], rseid[1], rseid[2], rseid[3] )
                 compressed = zlib.compress(bson)
                 reply.append(compressed)
 

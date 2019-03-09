@@ -4,6 +4,7 @@ from larlite import larlite
 from larcv import larcv
 from ublarcvapp import ublarcvapp
 import zlib
+from ctypes import c_int, byref
 
 #larcv.load_pyutils()
 larcv.json.load_jsonutils()
@@ -69,7 +70,10 @@ class UBSSNetClient(Client):
         ev_wholeview = self._inlarcv.get_data(larcv.kProductImage2D,"wire")
         wholeview_v = ev_wholeview.Image2DArray()
         nplanes = wholeview_v.size()
-        print "number of planes in entry: ",nplanes
+        run    = self._inlarcv.event_id().run()
+        subrun = self._inlarcv.event_id().subrun()
+        event  = self._inlarcv.event_id().event()
+        print "num of planes in entry {}: ".format((run,subrun,event)),nplanes
 
         # define the roi_v images
         roi_v = []
@@ -121,7 +125,7 @@ class UBSSNetClient(Client):
             print "plane[{}]: {}".format(plane,len(img2d_v[plane]))
 
         # send messages
-        replies = self.send_image_list(img2d_v)
+        replies = self.send_image_list(img2d_v,run=run,subrun=subrun,event=event)
         self.process_received_images(wholeview_v,replies)
 
         self._outlarcv.set_id( self._inlarcv.event_id().run(),
@@ -132,16 +136,20 @@ class UBSSNetClient(Client):
         return True
 
 
-    def send_image_list(self,img2d_list):
+    def send_image_list(self,img2d_list, run=0, subrun=0, event=0):
         """ send all images in an event to the worker and receive msgs"""
         planes = img2d_list.keys()
         planes.sort()
-        self._log.debug("sending images from {} planes.".format(planes))
+        rse = (run,subrun,event)
+        self._log.info("sending images with rse={}".format(rse))
+
         imgout_v = {}
         nsize_uncompressed = 0
         nsize_compressed = 0
         received_compressed = 0
         received_uncompressed = 0
+        imageid_received = {}
+        nimages_sent = 0
         for p in planes:
             if p not in imgout_v:
                 imgout_v[p] = []
@@ -150,17 +158,22 @@ class UBSSNetClient(Client):
             #    continue
 
 
-            self._log.debug("images in plane[{}]: {}."
+            self._log.debug("sending images in plane[{}]: num={}."
                             .format(p,len(img2d_list[p])))
 
             # send image
             msg = []
             for img2d in img2d_list[p]:
-                bson = larcv.json.as_pystring(img2d)
+                img_id = nimages_sent # make an id to track if it comes back
+                bson = larcv.json.as_pystring(img2d,
+                                              run, subrun, event, img_id)
                 nsize_uncompressed += len(bson)
                 compressed = zlib.compress(bson)
                 nsize_compressed   += len(compressed)
                 msg.append(compressed)
+                # we make a flag to mark if we got this back
+                imageid_received[img_id] = False
+                nimages_sent += 1
             self.send("ubssnet_plane%d"%(p),*msg)
 
             # receives
@@ -179,15 +192,45 @@ class UBSSNetClient(Client):
                     received_compressed += len(data)
                     data = zlib.decompress(data)
                     received_uncompressed += len(data)
-                    replyimg = larcv.json.image2d_from_pystring(data)
-                    imgout_v[p].append(replyimg)
-                    self._log.debug("total converted plane[{}] images: {}"
-                                    .format(p,len(imgout_v[p])))
+                    c_run = c_int()
+                    c_subrun = c_int()
+                    c_event = c_int()
+                    c_id = c_int()
+                    replyimg = larcv.json.image2d_from_pystring(data,
+                                c_run, c_subrun, c_event, c_id )
+                        #byref(c_run),byref(c_subrun),byref(c_event),byref(c_id))
+                    rep_rse = (c_run.value,c_subrun.value,
+                                c_event.value,c_id.value)
+                    self._log.debug("rec images with rse={}".format(rep_rse))
+                    if rep_rse!=rse:
+                        self._log.warning("image with wronge rse={}. ignoring."
+                                    .format(rep_rse))
+                        continue
+                    if c_id.value not in imageid_received:
+                        self._log.warning("img id=%d not in IDset"%(c_id.value))
+                        continue
+                    else:
+                        imageid_received[c_id.value] = True
+                    self._log.debug("received image with correct rseid={}"
+                                        .format(rep_rse))
 
+                    imgout_v[p].append(replyimg)
+                self._log.debug("running total, converted plane[{}] images: {}"
+                                .format(p,len(imgout_v[p])))
+            complete = True
             # should be a multiple of 2: (shower,track)
             if len(imgout_v[p])>0 and len(imgout_v[p])%2!=0:
+                complete = False
+            # should have got all images back
+            for id,received in imageid_received.items():
+                if not received:
+                    complete = False
+                    self._log.error("Did not receive image[%d]"%(id))
+
+            if not complete:
                 raise RuntimeError(\
                     "Did not receive complete set for all images")
+
         self._log.debug("Total sent size. uncompressed=%.2f MB compreseed=%.2f"\
                         %(nsize_uncompressed/1.0e6,nsize_compressed/1.0e6))
         self._log.debug("Total received. compressed=%.2f uncompressed=%.2f MB"\
@@ -227,8 +270,11 @@ class UBSSNetClient(Client):
             ev_track.Append(trackimg)
             #ev_bg.Append(bgimg)
 
-    def process_entries(self):
-        for ientry in xrange(self.get_entries()):
+    def process_entries(self,start=0, end=-1):
+        if end<0:
+            end = self.get_entries()-1
+
+        for ientry in xrange(start,end+1):
             self.process_entry(ientry)
 
     def finalize(self):
