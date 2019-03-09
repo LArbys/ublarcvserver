@@ -1,7 +1,7 @@
 import os,sys,logging
 from multiprocessing import Process
 from UBSSNetWorker import UBSSNetWorker
-from ublarcvserver import Broker
+from ublarcvserver import start_broker
 
 """
 Start the broker and worker. Run one client. Useful for tests.
@@ -51,12 +51,14 @@ if __name__ == "__main__":
     endpoint  = "tcp://localhost:6005"
     bindpoint = "tcp://*:6005"
     weights_dir = "/home/twongjirad/working/nutufts/pytorch-uresnet/weights/"
-    weights_files = {2:weights_dir+"/saved_caffe_weights_plane2.tar"}
+    weights_files = {0:weights_dir+"/mcc8_caffe_ubssnet_plane0.tar",
+                     1:weights_dir+"/mcc8_caffe_ubssnet_plane1.tar",
+                     2:weights_dir+"/mcc8_caffe_ubssnet_plane2.tar"}
 
     logging.basicConfig(level=logging.DEBUG)
 
     pbroker = start_broker(bindpoint)
-    pworkers = startup_ubssnet_workers(endpoint,weights_files,nplanes=[2])
+    pworkers = startup_ubssnet_workers(endpoint,weights_files,nplanes=[0,1,2])
 
     print "[ENTER] to quit."
     raw_input()
