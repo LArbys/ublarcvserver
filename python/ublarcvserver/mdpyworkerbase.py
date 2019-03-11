@@ -12,7 +12,7 @@ class MDPyWorkerBase(object):
     def __init__(self, service_name, broker_address,
                     zmq_context=None, id_name=None, verbose=False,
                     heartbeat_interval_secs=2.5,
-                    heartbeat_timeout_secs=10.0,
+                    heartbeat_timeout_secs=60.0,
                     ssh_thru_server=None, ssh_password=None ):
         self._broker_address = broker_address
         self._service_name   = service_name.encode('ascii')

@@ -19,6 +19,7 @@ import logging
 from typing import Iterable, List, Optional, Tuple  # noqa: F401
 
 import zmq
+from zmq import ssh
 
 from . import error as e
 from . import protocol as p
@@ -66,12 +67,12 @@ class Client(object):
         if self._ssh_thru_server is None:
             self._socket.connect(self.broker_url)
         else:
-            ssh.tunnel_connection(self._socket, self._broker_url,
+            ssh.tunnel_connection(self._socket, self.broker_url,
                                     self._ssh_thru_server,
                                     password=self._ssh_password )
             self._log.info("Connected to broker at {} via ssh-tunnel {}"
-                            .format(self._broker_url,self._ssh_thru_server))
-        
+                            .format(self.broker_url,self._ssh_thru_server))
+
         self._log.debug("Connected to broker on ZMQ DEALER socket at %s", self.broker_url)
         self._expect_reply = False
 
