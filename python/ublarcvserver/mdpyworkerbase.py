@@ -1,23 +1,33 @@
 import zmq
 import time, abc, logging
 import majortomo.protocol as p
+from zmq import ssh
 
 class MDPyWorkerBase(object):
     __metaclass__ = abc.ABCMeta
     _ninstances = 0
 
+
+
     def __init__(self, service_name, broker_address,
                     zmq_context=None, id_name=None, verbose=False,
                     heartbeat_interval_secs=2.5,
-                    heartbeat_timeout_secs=10.0 ):
+                    heartbeat_timeout_secs=10.0,
+                    ssh_thru_server=None, ssh_password=None ):
         self._broker_address = broker_address
         self._service_name   = service_name.encode('ascii')
         self._verbose        = verbose
         self._heartbeat_timeout  = heartbeat_timeout_secs
         self._heartbeat_interval = heartbeat_interval_secs
 
-        # create the socket we need
-        # its a simple request/reply socket
+        # determine if the user is asking to connect via ssh
+        if ssh_thru_server is not None and type(ssh_thru_server) is not str:
+            raise ValueError("ssh_thru_server should be a str with\
+             server address, e.g. user@server")
+        self._ssh_thru_server = ssh_thru_server
+        self._ssh_password = ssh_password # this is terrible
+
+        # set the zmq context
         print "zmq_context:",zmq_context
         self._context = zmq_context if zmq_context else zmq.Context()
 
@@ -62,10 +72,19 @@ class MDPyWorkerBase(object):
 
         # Set up socket
         self._socket = self._context.socket(zmq.DEALER)
-        #self._socket.setsockopt(zmq.LINGER)
-        self._socket.connect(self._broker_address)
-        self._log.debug("Connected to broker on ZMQ DEALER socket at %s",
+
+        # make the type of connection requested
+        if self._ssh_thru_server is None:
+            # regular connection, a simple request/reply socket
+            self._socket.connect(self._broker_address)
+            self._log.info("Connected to broker at %s",
                         self._broker_address)
+        else:
+            ssh.tunnel_connection(self._socket, self._broker_address,
+                                    self._ssh_thru_server,
+                                    password=self._ssh_password )
+            self._log.info("Connected to broker at {} via ssh-tunnel {}"
+                            .format(self._broker_address,self._ssh_thru_server))
 
         self._poller = zmq.Poller()
         self._poller.register(self._socket, zmq.POLLIN)

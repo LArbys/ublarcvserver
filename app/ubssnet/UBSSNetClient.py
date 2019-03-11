@@ -12,14 +12,17 @@ larcv.json.load_jsonutils()
 class UBSSNetClient(Client):
 
     def __init__(self, broker_address,
-                    larcv_supera_file, image2d_tree_name,
+                    larcv_supera_file,
                     output_larcv_filename,
-                    larlite_opreco_file=None, apply_opflash_roi=False,
+                    larlite_opreco_file=None, apply_opflash_roi=True,
+                    adc_producer="wire", opflash_producer="simpleFlashBeam",
                     tick_backwards=False, ssnet_tree_name="ssnet",
                     intimewin_min_tick=190, intimewin_max_tick=320,**kwargs):
         """
         """
         super(UBSSNetClient,self).__init__(broker_address,**kwargs)
+
+        # setup the input and output larcv iomanager, input larlite manager
         tick_direction = larcv.IOManager.kTickForward
         if tick_backwards:
             tick_direction = larcv.IOManager.kTickBackward
@@ -34,16 +37,17 @@ class UBSSNetClient(Client):
             self._inlarlite = LArliteManager(larlite.storage_manager.kREAD)
             self._inlarlite.add_in_filename(larlite_opreco_file)
             self._inlarlite.open()
-            self._inlarlite.set_verbosity(0)
+            #self._inlarlite.set_verbosity(0)
 
         self._outlarcv = larcv.IOManager(larcv.IOManager.kWRITE)
         self._outlarcv.set_out_file(output_larcv_filename)
         self._outlarcv.initialize()
         self._log = logging.getLogger(__name__)
 
-
         FixedCROIFromFlash = ublarcvapp.ubdllee.FixedCROIFromFlashAlgo
-        self._ssnet_tree_name = ssnet_tree_name
+        self._ssnet_tree_name  = ssnet_tree_name
+        self._adc_producer     = adc_producer
+        self._opflash_producer = opflash_producer
         self._apply_opflash_roi = apply_opflash_roi
         if self._apply_opflash_roi:
             self._croi_fromflash_algo = FixedCROIFromFlash()
@@ -67,7 +71,8 @@ class UBSSNetClient(Client):
             raise RuntimeError("could not read larcv entry %d"%(entry_num))
 
         # get data
-        ev_wholeview = self._inlarcv.get_data(larcv.kProductImage2D,"wire")
+        ev_wholeview = self._inlarcv.get_data(larcv.kProductImage2D,
+                                              self._adc_producer)
         wholeview_v = ev_wholeview.Image2DArray()
         nplanes = wholeview_v.size()
         run    = self._inlarcv.event_id().run()
@@ -83,7 +88,7 @@ class UBSSNetClient(Client):
             # this is weird behavior by larcv that I need to fix
             self._inlarlite.syncEntry(self._inlarcv)
             ev_opflash = self._inlarlite.get_data(larlite.data.kOpFlash,
-                                                    "simpleFlashBeam")
+                                                  self._opflash_producer)
             nintime_flash = 0
             for iopflash in xrange(ev_opflash.size()):
                 opflash = ev_opflash.at(iopflash)
@@ -242,9 +247,11 @@ class UBSSNetClient(Client):
         nplanes = wholeview_v.size()
 
         ev_shower = self._outlarcv.\
-                        get_data(larcv.kProductImage2D,"ssnet_shower")
+                        get_data(larcv.kProductImage2D,
+                                 self._ssnet_tree_name+"_shower")
         ev_track  = self._outlarcv.\
-                        get_data(larcv.kProductImage2D,"ssnet_track")
+                        get_data(larcv.kProductImage2D,
+                                 self._ssnet_tree_name+"_track")
         #ev_bg     = self._outlarcv.\
         #                get_data(larcv.kProductImage2D,"ssnet_background")
 

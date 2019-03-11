@@ -12,9 +12,9 @@ Implements worker for ubssnet
 class UBSSNetWorker(MDPyWorkerBase):
 
     def __init__(self,broker_address,plane,
-                weight_file,device,batch_size,
+                 weight_file,device,batch_size,
                  use_half=False,
-                **kwargs):
+                 **kwargs):
         """
         Constructor
 

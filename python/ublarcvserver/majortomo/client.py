@@ -33,7 +33,8 @@ class Client(object):
     :type _socket: zmq.Socket
     """
     def __init__(self, broker_url,
-                 zmq_context=None, zmq_linger=DEFAULT_ZMQ_LINGER):
+                 zmq_context=None, zmq_linger=DEFAULT_ZMQ_LINGER,
+                 ssh_thru_server=None, ssh_password=None):
         # type: (str, Optional[zmq.Context], int) -> None
         self.broker_url = broker_url
         self._socket = None  # type: zmq.Socket
@@ -41,6 +42,15 @@ class Client(object):
         self._linger = zmq_linger
         self._log = logging.getLogger(__name__)
         self._expect_reply = False
+
+        # ssh option
+        if ssh_thru_server is not None and type(ssh_thru_server) is not str:
+            raise ValueError("ssh_thru_server should be a str with\
+             server address, e.g. user@server")
+            if type(ssh_password) is not str:
+                raise ValueError("password should be a string")
+        self._ssh_thru_server=ssh_thru_server
+        self._ssh_password=ssh_password
 
     def connect(self, reconnect=False):
         # type: (bool) -> None
@@ -52,7 +62,16 @@ class Client(object):
         # Set up socket
         self._socket = self._zmq_context.socket(zmq.DEALER)
         self._socket.setsockopt(zmq.LINGER, self._linger)
-        self._socket.connect(self.broker_url)
+
+        if self._ssh_thru_server is None:
+            self._socket.connect(self.broker_url)
+        else:
+            ssh.tunnel_connection(self._socket, self._broker_url,
+                                    self._ssh_thru_server,
+                                    password=self._ssh_password )
+            self._log.info("Connected to broker at {} via ssh-tunnel {}"
+                            .format(self._broker_url,self._ssh_thru_server))
+        
         self._log.debug("Connected to broker on ZMQ DEALER socket at %s", self.broker_url)
         self._expect_reply = False
 

@@ -7,9 +7,14 @@ from ublarcvserver import start_broker
 Start the broker and worker. Run one client. Useful for tests.
 """
 
-def start_ubssnet_worker(broker_address,plane,weight_file,device,batch_size):
+def start_ubssnet_worker(broker_address,plane,weight_file,
+                         device,batch_size,
+                         ssh_thru_server,ssh_password):
     print batch_size,type(batch_size)
-    worker=UBSSNetWorker(broker_address,plane,weight_file,device,batch_size)
+    worker=UBSSNetWorker(broker_address,plane,weight_file,
+                         device,batch_size,
+                         ssh_thru_server=ssh_thru_server,
+                         ssh_password=ssh_password)
     worker.connect()
     print "worker started: ",worker.idname()
     worker.run()
@@ -18,7 +23,9 @@ def start_ubssnet_worker(broker_address,plane,weight_file,device,batch_size):
 def startup_ubssnet_workers( broker_address, weights_files,
                              devices=["cuda","cuda","cuda"],
                              batch_size=1,
-                             nplanes=[0,1,2]):
+                             nplanes=[0,1,2],
+                             ssh_thru_server=None, ssh_password=None,
+                             start=True):
     if type(devices) is str:
         devices = len(nplanes)*[devices]
     if len(devices)>len(nplanes):
@@ -33,12 +40,14 @@ def startup_ubssnet_workers( broker_address, weights_files,
     for p,device in zip(nplanes,devices):
         pworker = Process(target=start_ubssnet_worker,
                           args=(broker_address,p,weights_files[p],
-                                device,batch_size,))
+                                device,batch_size,
+                                ssh_thru_server,ssh_password))
         pworker.daemon = True
         pworkers.append(pworker)
 
-    for pworker in pworkers:
-        pworker.start()
+    if start:
+        for pworker in pworkers:
+            pworker.start()
 
     return pworkers
 
