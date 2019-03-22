@@ -6,14 +6,13 @@ from ublarcvserver import MDPyWorkerBase, Broker, Client
 larcv.json.load_jsonutils()
 
 """
-Implements worker for ubssnet
+Implements worker for Infill network
 """
 
-class UBSSNetWorker(MDPyWorkerBase):
+class UBInfillWorker(MDPyWorkerBase):
 
     def __init__(self,broker_address,plane,
-                 weight_file,device,batch_size,
-                 use_half=False,
+                 device,batch_size,
                  **kwargs):
         """
         Constructor
@@ -22,7 +21,6 @@ class UBSSNetWorker(MDPyWorkerBase):
         ------
         broker_address str IP address of broker
         plane int Plane ID number. Currently [0,1,2] only
-        weight_file str path to files with weights
         batch_size int number of batches to process in one pass
         """
         if type(plane) is not int:
@@ -39,30 +37,35 @@ class UBSSNetWorker(MDPyWorkerBase):
         self.plane = plane
         self.batch_size = batch_size
         self._still_processing_msg = False
-        self._use_half = use_half
-        service_name = "ubssnet_plane%d"%(self.plane)
+        service_name = "infill_plane%d"%(self.plane)
 
-        super(UBSSNetWorker,self).__init__( service_name,
+        super(UBInfillWorker,self).__init__( service_name,
                                             broker_address, **kwargs)
 
-        self.load_model(weight_file,device,self._use_half)
+        self.load_model(device)
         if self.is_model_loaded():
-            self._log.info("Loaded ubSSNet model. Service={}"\
+            self._log.info("Loaded ubInfill model. Service={}"\
                             .format(service_name))
 
-    def load_model(self,weight_file,device,use_half):
+    def load_model(self,device):
         # import pytorch
         try:
             import torch
         except:
             raise RuntimeError("could not load pytorch!")
 
-        # import model
+        # ----------------------------------------------------------------------
+        # import model - change to my model
+        if "INFILL_MODELDIR" in os.environ: # should have been placed there by configure.sh script
+            INFILL_MODELDIR=os.environ["INFILL_MODELDIR"]
+            sys.path.append(INFILL_MODELDIR)
+        else:
+            sys.path.append("/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill")
         try:
-            from ubssnet import ubSSNet
+            from ub_uresnet_infill import UResNetInfill
         except:
-            raise RuntimeError("could not load ubSSNet model. did you remember"
-                            +" to setup pytorch-uresnet?")
+            raise RuntimeError("could not load Infill model. did you remember"
+                            +" to setup?")
 
         if "cuda" not in device and "cpu" not in device:
             raise ValueError("invalid device name [{}]. Must str with name \
@@ -71,11 +74,10 @@ class UBSSNetWorker(MDPyWorkerBase):
         self._log = logging.getLogger(self.idname())
 
         self.device = torch.device(device)
-        if not self._use_half:
-            self.model = ubSSNet(weight_file).to(self.device)
-        else:
-            self.model = ubSSNet(weight_file).half().to(self.device)
+
+        self.model = UResNetInfill(inplanes=32,input_channels=1,num_classes=1,showsizes=True).to(self.device)
         self.model.eval()
+        # ----------------------------------------------------------------------
 
 
     def make_reply(self,request,nreplies):
@@ -152,8 +154,6 @@ class UBSSNetWorker(MDPyWorkerBase):
         self._log.debug("converted msgs into batch of {} images. frames={}"
                         .format(nimgs,frames_used))
         np_dtype = np.float32
-        if self._use_half:
-            np_dtype = np.float16
         img_batch_np = np.zeros( (nimgs,1,sizes[0][0],sizes[0][1]),
                                     dtype=np_dtype )
 
@@ -161,17 +161,13 @@ class UBSSNetWorker(MDPyWorkerBase):
             meta = img2d.meta()
             img2d_np = larcv.as_ndarray( img2d )\
                             .reshape( (1,1,meta.cols(),meta.rows()))
-            if not self._use_half:
-                img_batch_np[iimg,:] = img2d_np
-            else:
-                img_batch_np[iimg,:] = img2d_np.as_type(np.float16)
+
+            img_batch_np[iimg,:] = img2d_np
+
 
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
         out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
-
-        # remove background values
-        out_batch_np = out_batch_np[:,1:,:,:]
 
         # compression techniques
         ## 1) threshold values to zero
@@ -186,9 +182,6 @@ class UBSSNetWorker(MDPyWorkerBase):
             out_batch_np[:,ich,:,:][ img_batch_np[:,0,:,:]<10.0 ] = 0.0
 
         # convert back to full precision, if we used half-precision in the net
-        if self._use_half:
-            out_batch_np = out_batch_np.as_type(np.float32)
-
 
         self._log.debug("passed images through net. output batch shape={}"
                         .format(out_batch_np.shape))
