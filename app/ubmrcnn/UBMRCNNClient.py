@@ -9,18 +9,19 @@ from ctypes import c_int, byref
 #larcv.load_pyutils()
 larcv.json.load_jsonutils()
 
-class UBSSNetClient(Client):
+class UBMRCNNClient(Client):
 
     def __init__(self, broker_address,
                     larcv_supera_file,
                     output_larcv_filename,
-                    larlite_opreco_file=None, apply_opflash_roi=True,
-                    adc_producer="wire", opflash_producer="simpleFlashBeam",
-                    tick_backwards=False, ssnet_tree_name="ssnet",
+                    adc_producer="wire",
+                    skip_detsplit=True,
+                    opflash_producer="simpleFlashBeam",
+                    tick_backwards=False, mrcnn_tree_name="mrcnn",
                     intimewin_min_tick=190, intimewin_max_tick=320,**kwargs):
         """
         """
-        super(UBSSNetClient,self).__init__(broker_address,**kwargs)
+        super(UBMRCNNClient,self).__init__(broker_address,**kwargs)
 
         # setup the input and output larcv iomanager, input larlite manager
         tick_direction = larcv.IOManager.kTickForward
@@ -30,14 +31,15 @@ class UBSSNetClient(Client):
                                         tick_direction)
         self._inlarcv.add_in_file(larcv_supera_file)
         self._inlarcv.initialize()
+        self.skip_detsplit=skip_detsplit
 
         LArliteManager = ublarcvapp.LArliteManager
         self._inlarlite = None
-        if larlite_opreco_file is not None:
-            self._inlarlite = LArliteManager(larlite.storage_manager.kREAD)
-            self._inlarlite.add_in_filename(larlite_opreco_file)
-            self._inlarlite.open()
-            #self._inlarlite.set_verbosity(0)
+        # if larlite_opreco_file is not None:
+        #     self._inlarlite = LArliteManager(larlite.storage_manager.kREAD)
+        #     self._inlarlite.add_in_filename(larlite_opreco_file)
+        #     self._inlarlite.open()
+        #     #self._inlarlite.set_verbosity(0)
 
         self._outlarcv = larcv.IOManager(larcv.IOManager.kWRITE)
         self._outlarcv.set_out_file(output_larcv_filename)
@@ -45,16 +47,11 @@ class UBSSNetClient(Client):
         self._log = logging.getLogger(__name__)
 
         FixedCROIFromFlash = ublarcvapp.ubdllee.FixedCROIFromFlashAlgo
-        self._ssnet_tree_name  = ssnet_tree_name
+        self._mrcnn_tree_name  = mrcnn_tree_name
         self._adc_producer     = adc_producer
         self._opflash_producer = opflash_producer
-        self._apply_opflash_roi = apply_opflash_roi
-        if self._apply_opflash_roi:
-            self._croi_fromflash_algo = FixedCROIFromFlash()
-            self._intimewin_min_tick = intimewin_min_tick
-            self._intimewin_max_tick = intimewin_max_tick
-        else:
-            self._ubsplitdet = None
+
+        self._ubsplitdet = None
 
     def get_entries(self):
         return self._inlarcv.get_n_entries()
@@ -81,53 +78,62 @@ class UBSSNetClient(Client):
         print("num of planes in entry {}: ".format((run,subrun,event)),nplanes)
 
         # define the roi_v images
-        roi_v = []
-        if self._inlarlite and self._apply_opflash_roi:
-            # use the intime flash to look for a CROI
-            # note, need to get data from larcv first else won't sync properly
-            # this is weird behavior by larcv that I need to fix
-            self._inlarlite.syncEntry(self._inlarcv)
-            ev_opflash = self._inlarlite.get_data(larlite.data.kOpFlash,
-                                                  self._opflash_producer)
-            nintime_flash = 0
-            for iopflash in xrange(ev_opflash.size()):
-                opflash = ev_opflash.at(iopflash)
-                if ( opflash.Time()<self._intimewin_min_tick*0.015625
-                    or opflash.Time()>self._intimewin_max_tick*0.015625):
-                    continue
-                flashrois=self._croi_fromflash_algo.findCROIfromFlash(opflash);
-                for iroi in xrange(flashrois.size()):
-                    roi_v.append( flashrois.at(iroi) )
-                nintime_flash += 1
-            print("number of intime flashes: ",nintime_flash)
-        else:
-            # we split the entire image
-            raise RuntimeError("Use of ubsplitdet for image not implemented")
-
-
-
-        # make crops from the roi_v
         img2d_v = {}
-        for plane in xrange(nplanes):
-            if plane not in img2d_v:
-                img2d_v[plane] = []
+        if not self.skip_detsplit:
+            roi_v = []
+            if self._inlarlite and self._apply_opflash_roi:
+                # use the intime flash to look for a CROI
+                # note, need to get data from larcv first else won't sync properly
+                # this is weird behavior by larcv that I need to fix
+                self._inlarlite.syncEntry(self._inlarcv)
+                ev_opflash = self._inlarlite.get_data(larlite.data.kOpFlash,
+                                                      self._opflash_producer)
+                nintime_flash = 0
+                for iopflash in range(ev_opflash.size()):
+                    opflash = ev_opflash.at(iopflash)
+                    if ( opflash.Time()<self._intimewin_min_tick*0.015625
+                        or opflash.Time()>self._intimewin_max_tick*0.015625):
+                        continue
+                    flashrois=self._croi_fromflash_algo.findCROIfromFlash(opflash);
+                    for iroi in range(flashrois.size()):
+                        roi_v.append( flashrois.at(iroi) )
+                    nintime_flash += 1
+                print("number of intime flashes: ",nintime_flash)
+            else:
+                # we split the entire image
+                raise RuntimeError("Use of ubsplitdet for image not implemented")
 
-        for roi in roi_v:
-            for plane in xrange(nplanes):
+
+            # make crops from the roi_v
+            for plane in range(nplanes):
                 if plane not in img2d_v:
                     img2d_v[plane] = []
 
-                wholeimg = wholeview_v.at(plane)
-                bbox = roi.BB(plane)
-                img2d = wholeimg.crop( bbox )
+            for roi in roi_v:
+                for plane in range(nplanes):
+                    if plane not in img2d_v:
+                        img2d_v[plane] = []
 
-                img2d_v[plane].append( img2d )
+                    wholeimg = wholeview_v.at(plane)
+                    bbox = roi.BB(plane)
+                    img2d = wholeimg.crop( bbox )
 
-        planes = img2d_v.keys()
-        planes.sort()
-        print("Number of images on each plane:")
-        for plane in planes:
-            print("plane[{}]: {}".format(plane,len(img2d_v[plane])))
+                    img2d_v[plane].append( img2d )
+
+            planes = img2d_v.keys()
+            sorted(planes)
+            print("Number of images on each plane:")
+            for plane in planes:
+                print("plane[{}]: {}".format(plane,len(img2d_v[plane])))
+
+        else:
+            print("Planning on Skipping the detsplit. Guess you're working on full images?")
+            for plane in range(nplanes):
+                img2d_v[plane] = [wholeview_v.at(plane)]
+
+        for k,v in img2d_v.items():
+            print("Plane:", k, " type of value:", type(v))
+
 
         # send messages
         replies = self.send_image_list(img2d_v,run=run,subrun=subrun,event=event)
@@ -144,7 +150,7 @@ class UBSSNetClient(Client):
     def send_image_list(self,img2d_list, run=0, subrun=0, event=0):
         """ send all images in an event to the worker and receive msgs"""
         planes = img2d_list.keys()
-        planes.sort()
+        sorted(planes)
         rse = (run,subrun,event)
         self._log.info("sending images with rse={}".format(rse))
 
@@ -179,7 +185,7 @@ class UBSSNetClient(Client):
                 # we make a flag to mark if we got this back
                 imageid_received[img_id] = False
                 nimages_sent += 1
-            self.send("ubssnet_plane%d"%(p),*msg)
+            self.send("ubmrcnn_plane%d"%(p),*msg)
 
             # receives
             isfinal = False
@@ -248,14 +254,14 @@ class UBSSNetClient(Client):
 
         ev_shower = self._outlarcv.\
                         get_data(larcv.kProductImage2D,
-                                 self._ssnet_tree_name+"_shower")
+                                 self._mrcnn_tree_name+"_shower")
         ev_track  = self._outlarcv.\
                         get_data(larcv.kProductImage2D,
-                                 self._ssnet_tree_name+"_track")
+                                 self._mrcnn_tree_name+"_track")
         #ev_bg     = self._outlarcv.\
-        #                get_data(larcv.kProductImage2D,"ssnet_background")
+        #                get_data(larcv.kProductImage2D,"mrcnn_background")
 
-        for p in xrange(nplanes):
+        for p in range(nplanes):
 
             showerimg = larcv.Image2D( wholeview_v.at(p).meta() )
             #bgimg     = larcv.Image2D( wholeview_v.at(p).meta() )
@@ -265,7 +271,7 @@ class UBSSNetClient(Client):
             trackimg.paint(0)
 
             nimgsets = len(outimg_v[p])/2
-            for iimgset in xrange(nimgsets):
+            for iimgset in range(nimgsets):
                 #bg  = outimg_v[p][iimgset*3+0]
                 shr = outimg_v[p][iimgset*2+0]
                 trk = outimg_v[p][iimgset*2+1]
@@ -281,7 +287,7 @@ class UBSSNetClient(Client):
         if end<0:
             end = self.get_entries()-1
 
-        for ientry in xrange(start,end+1):
+        for ientry in range(start,end+1):
             self.process_entry(ientry)
 
     def finalize(self):

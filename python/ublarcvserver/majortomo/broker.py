@@ -15,9 +15,11 @@ from typing import DefaultDict, Dict, Generator, List, Optional, Tuple, Union  #
 import figcan
 import yaml
 import zmq
+from . import error
+from . import protocol
 
-import error, protocol
-from config import DEFAULT_BIND_URL, default_config
+# import error, protocol
+from .config import DEFAULT_BIND_URL, default_config
 
 
 class Broker:
