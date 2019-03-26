@@ -59,7 +59,7 @@ class SparseLArFlow3DConsistencyLoss(nn.Module):
         self._reduce = reduce
 
         #self.truth1_input = scn.InputLayer(2,(nrows,ncols),mode=0)
-        #self.truth2_input = scn.InputLayer(2,(nrows,ncols),mode=0) 
+        #self.truth2_input = scn.InputLayer(2,(nrows,ncols),mode=0)
         self.outlayer1 = scn.OutputLayer(2)
         self.outlayer2 = scn.OutputLayer(2)
 
@@ -72,7 +72,7 @@ class SparseLArFlow3DConsistencyLoss(nn.Module):
         -----
         coord_t       [SparseConvTensor (N,3)]: list of (row,col,batch)
         flow1_predict [SparseConvTensor (N,1)]: predicted flow for Y2U.
-        flow2_predict [SparseConvTensor (N,1)]: predicted flow for Y2V. 
+        flow2_predict [SparseConvTensor (N,1)]: predicted flow for Y2V.
         flow1_truth   [tensor (N,1)]: predicted flow for Y2U.
         flow2_truth   [tensor (N,1)]: predicted flow for Y2V. Coordinates is where we is.
         """
