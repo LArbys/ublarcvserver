@@ -170,7 +170,7 @@ class UBSSNetClient(Client):
             msg = []
             for img2d in img2d_list[p]:
                 img_id = nimages_sent # make an id to track if it comes back
-                bson = larcv.json.as_pystring(img2d,
+                bson = larcv.json.as_pybytes(img2d,
                                               run, subrun, event, img_id)
                 nsize_uncompressed += len(bson)
                 compressed = zlib.compress(bson)
@@ -201,7 +201,7 @@ class UBSSNetClient(Client):
                     c_subrun = c_int()
                     c_event = c_int()
                     c_id = c_int()
-                    replyimg = larcv.json.image2d_from_pystring(data,
+                    replyimg = larcv.json.image2d_from_pybytes(data,
                                 c_run, c_subrun, c_event, c_id )
                         #byref(c_run),byref(c_subrun),byref(c_event),byref(c_id))
                     rep_rse = (c_run.value,c_subrun.value,

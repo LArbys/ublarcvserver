@@ -26,7 +26,8 @@ if __name__ == "__main__":
     pbroker = start_broker(bindpoint)
 
     pworkers = startup_ubmrcnn_workers(endpoint,weights_files,
-                                        devices="cuda",nplanes=[0,1,2],
+                                        # devices="cuda",nplanes=[0,1,2],
+                                        devices="cuda",nplanes=[0],
                                         batch_size=1)
 
     client = UBMRCNNClient(endpoint,larcv_supera_file,

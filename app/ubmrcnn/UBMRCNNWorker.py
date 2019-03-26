@@ -32,7 +32,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-import _init_paths
+import init_paths_dispatcher
 import nn as mynn
 from core.config import cfg, cfg_from_file, cfg_from_list, assert_and_infer_cfg
 from core.test import im_detect_all
@@ -92,12 +92,28 @@ class UBMRCNNWorker(MDPyWorkerBase):
 
         super(UBMRCNNWorker,self).__init__( service_name,
                                             broker_address, **kwargs)
+        # SSNET Load:
+        # self.load_model(weight_file,device,self._use_half)
+        # if self.is_model_loaded():
+        #     self._log.info("Loaded ubMRCNN model. Service={}"\
+        #                     .format(service_name))
 
-        self.load_model(weight_file,device,self._use_half)
-        if self.is_model_loaded():
-            self._log.info("Loaded ubMRCNN model. Service={}"\
-                            .format(service_name))
+        #Get Configs going:
 
+        dataset = datasets.get_particle_dataset()
+        cfg.TRAIN.DATASETS = ('particle_physics_train')
+        cfg.MODEL.NUM_CLASSES = 7
+
+        print('load cfg from file: {}'.format("mills_config_"+str(plane)+".yaml"))
+        cfg_from_file("mills_config_"+str(plane)+".yaml")
+        cfg.MODEL.LOAD_IMAGENET_PRETRAINED_WEIGHTS = False  # Don't need to load imagenet pretrained weights
+        assert_and_infer_cfg()
+
+        #MRCNN Load:
+        maskRCNN = Generalized_RCNN()
+        maskRCNN.cuda()
+        checkpoint = torch.load(weight_file, map_location=lambda storage, loc: storage)
+        net_utils.load_ckpt(maskRCNN, checkpoint['model'])
 
     def load_model(self,weight_file,device,use_half):
         # import pytorch
@@ -166,7 +182,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
                 c_subrun = c_int()
                 c_event = c_int()
                 c_id = c_int()
-                img2d = larcv.json.image2d_from_pystring(data,
+                img2d = larcv.json.image2d_from_pybytes(data,
                                         c_run, c_subrun, c_event, c_id )
             except:
                 self._log.error("Image Data in message part {}\
@@ -251,7 +267,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
             for ich in xrange(out_batch_np.shape[1]):
                 out_np = out_batch_np[iimg,ich,:,:]
                 out_img2d = larcv.as_image2d_meta( out_np, meta )
-                bson = larcv.json.as_pystring( out_img2d,
+                bson = larcv.json.as_pybytes( out_img2d,
                                     rseid[0], rseid[1], rseid[2], rseid[3] )
                 compressed = zlib.compress(bson)
                 reply.append(compressed)

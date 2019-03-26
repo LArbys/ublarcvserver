@@ -116,7 +116,7 @@ class UBSSNetWorker(MDPyWorkerBase):
                 c_subrun = c_int()
                 c_event = c_int()
                 c_id = c_int()
-                img2d = larcv.json.image2d_from_pystring(data,
+                img2d = larcv.json.image2d_from_pybytes(data,
                                         c_run, c_subrun, c_event, c_id )
             except:
                 self._log.error("Image Data in message part {}\
@@ -201,7 +201,7 @@ class UBSSNetWorker(MDPyWorkerBase):
             for ich in xrange(out_batch_np.shape[1]):
                 out_np = out_batch_np[iimg,ich,:,:]
                 out_img2d = larcv.as_image2d_meta( out_np, meta )
-                bson = larcv.json.as_pystring( out_img2d,
+                bson = larcv.json.as_pybytes( out_img2d,
                                     rseid[0], rseid[1], rseid[2], rseid[3] )
                 compressed = zlib.compress(bson)
                 reply.append(compressed)
