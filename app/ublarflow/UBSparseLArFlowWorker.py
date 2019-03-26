@@ -65,6 +65,7 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
         # import pytorch
         try:
             import torch
+            import sparseconvnet as scn
         except:
             raise RuntimeError("could not load pytorch!")
 
@@ -92,6 +93,8 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
         params = torch.load(weight_file,map_location=map_locations)
         self.model.load_state_dict(params["state_dict"])
         self.model.eval()
+        self.outlayer1 = scn.OutputLayer(2)
+        self.outlayer2 = scn.OutputLayer(2)
 
     def make_reply(self,request,nreplies):
         """we load each image and pass it through the net.
@@ -226,11 +229,12 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
         predict1_t, predict2_t = self.model(coord_t, srcpix_t,
                                             tarpix_flow1_t, tarpix_flow2_t,
                                             len(imgdata_v))
-        predict1_t = predict1_t.features.detach().cpu().numpy()
-        predict2_t = predict2_t.features.detach().cpu().numpy()
+
+        out1_t = self.outlayer1(predict1_t).detach().cpu().numpy()
+        out2_t = self.outlayer2(predict2_t).detach().cpu().numpy()
 
         self._log.debug("passed images through net. output batch shape={}"
-                        .format(predict1_t.shape))
+                        .format(out1_t.shape))
 
         # now need to make individual images
 
@@ -245,8 +249,8 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
             # make numpy array to remake sparseimg
             sparse_np = np.zeros( (npts,2+nfeatures), dtype=np.float32 )
             sparse_np[:,0:2] = coord_np[start:end,0:2]
-            sparse_np[:,2]   = predict1_t[start:end,0]
-            sparse_np[:,3]   = predict2_t[start:end,0]
+            sparse_np[:,2]   = out1_t[start:end,0]
+            sparse_np[:,3]   = out2_t[start:end,0]
 
             outmeta_v = std.vector("larcv::ImageMeta")()
             outmeta_v.push_back( imgdata.meta_v().front() )
