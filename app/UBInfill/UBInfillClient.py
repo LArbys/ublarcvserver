@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import logging
 from ublarcvserver import Client
 from larlite import larlite
@@ -5,6 +7,7 @@ from larcv import larcv
 from ublarcvapp import ublarcvapp
 import zlib
 from ctypes import c_int, byref
+
 
 #larcv.load_pyutils()
 larcv.json.load_jsonutils()
@@ -62,68 +65,84 @@ class UBInfillClient(Client):
         run    = self._inlarcv.event_id().run()
         subrun = self._inlarcv.event_id().subrun()
         event  = self._inlarcv.event_id().event()
-        print "num of planes in entry {}: ".format((run,subrun,event)),nplanes
+        print("num of planes in entry {}: ".format((run,subrun,event)),nplanes)
 
         # crop using UBSplit for infill network
         # we want to break the image into set crops to send in
 
-        #  ---------------------------------------------------------------------
-        # ubresnet code:
+        # define the bbox_v images and cropped images
+        bbox_list = larcv.EventROI()
+        img2d_list = larcv.EventImage2D()
 
-        # # define the roi_v images
-        # roi_v = []
-        # if self._inlarlite and self._apply_opflash_roi:
-        #     # use the intime flash to look for a CROI
-        #     # note, need to get data from larcv first else won't sync properly
-        #     # this is weird behavior by larcv that I need to fix
-        #     self._inlarlite.syncEntry(self._inlarcv)
-        #     ev_opflash = self._inlarlite.get_data(larlite.data.kOpFlash,
-        #                                           self._opflash_producer)
-        #     nintime_flash = 0
-        #     for iopflash in xrange(ev_opflash.size()):
-        #         opflash = ev_opflash.at(iopflash)
-        #         if ( opflash.Time()<self._intimewin_min_tick*0.015625
-        #             or opflash.Time()>self._intimewin_max_tick*0.015625):
-        #             continue
-        #         flashrois=self._croi_fromflash_algo.findCROIfromFlash(opflash);
-        #         for iroi in xrange(flashrois.size()):
-        #             roi_v.append( flashrois.at(iroi) )
-        #         nintime_flash += 1
-        #     print "number of intime flashes: ",nintime_flash
-        # else:
-        #     # we split the entire image
-        #     raise RuntimeError("Use of ubsplitdet for image not implemented")
-        #
-        #
-        #
-        # # make crops from the roi_v
-        # img2d_v = {}
-        # for plane in xrange(nplanes):
-        #     if plane not in img2d_v:
-        #         img2d_v[plane] = []
-        #
-        # for roi in roi_v:
-        #     for plane in xrange(nplanes):
-        #         if plane not in img2d_v:
-        #             img2d_v[plane] = []
-        #
-        #         wholeimg = wholeview_v.at(plane)
-        #         bbox = roi.BB(plane)
-        #         img2d = wholeimg.crop( bbox )
-        #
-        #         img2d_v[plane].append( img2d )
-        #
+        bbox_v = larcv.EventROI().ROIArray()
+        img2d_v = larcv.EventImage2D().Image2DArray()
+
+        # we split the entire image using UBSplitDetector
+        scfg="""Verbosity: 3
+        InputProducer: \"wire\"
+        OutputBBox2DProducer: \"detsplit\"
+        CropInModule: true
+        OutputCroppedProducer: \"detsplit\"
+        BBoxPixelHeight: 512
+        BBoxPixelWidth: 832
+        CoveredZWidth: 310
+        FillCroppedYImageCompletely: true
+        DebugImage: false
+        MaxImages: -1
+        RandomizeCrops: false
+        MaxRandomAttempts: 50
+        MinFracPixelsInCrop: -0.0001
+        """
+
+        fcfg = open("ubsplit.cfg",'w')
+        print(scfg,end="",file=fcfg)
+        fcfg.close()
+
+
+        cfg = larcv.CreatePSetFromFile( "ubsplit.cfg", "UBSplitDetector" )
+        algo = ublarcvapp.UBSplitDetector()
+        algo.initialize()
+        algo.configure(cfg)
+        algo.set_verbosity(2)
+
+        bbox_list = larcv.EventROI()
+        img2du = []
+        img2dv = []
+        img2dy = []
+        img2d_list = []
+
+        bbox_v = larcv.EventROI().ROIArray()
+        img2d_v = larcv.EventImage2D().Image2DArray()
+
+        algo.process( wholeview_v,img2d_v,bbox_v )
+
+        for i in img2d_v:
+            p = i.meta().plane()
+            if p == 0:
+                img2du.append(i)
+            elif p == 1:
+                img2dv.append(i)
+            elif p == 2:
+                img2dy.append(i)
+
+        img2d_list.append(img2du)
+        img2d_list.append(img2dv)
+        img2d_list.append(img2dy)
+
+
         # planes = img2d_v.keys()
         # planes.sort()
         # print "Number of images on each plane:"
-        # for plane in planes:
-        #     print "plane[{}]: {}".format(plane,len(img2d_v[plane]))
-        # ----------------------------------------------------------------------
+        for plane in img2d_list:
+            print("In list" , len(plane))
+
 
         # send messages
         # (send crops to worker to go through network)
-        replies = self.send_image_list(img2d_v,run=run,subrun=subrun,event=event)
+        replies = self.send_image_list(img2d_list,run=run,subrun=subrun,event=event)
+        print ("FINISHED SEND STEP")
         self.process_received_images(wholeview_v,replies)
+        print ("FINISHED PROCESS STEP")
 
         self._outlarcv.set_id( self._inlarcv.event_id().run(),
                                self._inlarcv.event_id().subrun(),
@@ -135,7 +154,8 @@ class UBInfillClient(Client):
 
     def send_image_list(self,img2d_list, run=0, subrun=0, event=0):
         """ send all images in an event to the worker and receive msgs"""
-        planes = img2d_list.keys()
+        planes = [0,1,2]
+
         planes.sort()
         rse = (run,subrun,event)
         self._log.info("sending images with rse={}".format(rse))
@@ -155,7 +175,7 @@ class UBInfillClient(Client):
             #    continue
 
 
-            self._log.debug("sending images in plane[{}]: num={}."
+            self._log.info("sending images in plane[{}]: num={}."
                             .format(p,len(img2d_list[p])))
 
             # send image
@@ -172,6 +192,7 @@ class UBInfillClient(Client):
                 imageid_received[img_id] = False
                 nimages_sent += 1
             self.send("infill_plane%d"%(p),*msg)
+            print("sent plane to worker!")
 
             # receives
             isfinal = False
@@ -179,7 +200,7 @@ class UBInfillClient(Client):
                 workerout = self.recv_part()
                 isfinal =  workerout is None
                 if isfinal:
-                    self._log.debug("received done indicator by worker")
+                    self._log.info("received done indicator by worker")
                     break
                 self._log.debug("num frames received from worker: {}"
                                 .format(len(workerout)))
@@ -246,12 +267,37 @@ class UBInfillClient(Client):
         for p in xrange(nplanes):
 
             outputimg = larcv.Image2D( wholeview_v.at(p).meta() )
-            outputimg.paint(0)
+            # print("outputimg MIN_X: ",outputimg.meta().min_x())
+            # print("outputimg MAX_X: ",outputimg.meta().max_x())
+            # print("outputimg MIN_Y: ",outputimg.meta().min_y())
+            # print("outputimg MAX_Y: ",outputimg.meta().max_y())
+            # print()
+            # outputimg.paint(0)
+            outputimg.paint(-100)
             nimgsets = len(outimg_v[p])/2
 
             for iimgset in xrange(nimgsets):
                 out = outimg_v[p][iimgset]
                 outputimg.overlay(out,larcv.Image2D.kOverWrite)
+
+            # pseudocode for overlay with overlap
+            # for iimgset in xrange(nimgsets):
+            #     print("MIN_X: ",i.meta().min_x())
+            #     print("MAX_X: ",i.meta().max_x())
+            #     print("MIN_Y: ",i.meta().min_y())
+            #     print("MAX_Y: ",i.meta().max_y())
+            #     print()
+            #     out = outimg_v[p][iimgset]
+            #     # assuming meta info retained...
+            #     # if not, get info from BBox maybe?
+            #     for row in range(out.meta().min_y(),out.meta().max_y()):
+            #         for col in range(out.meta().min_x(),out.meta().max_x()):
+            #             pixvalue = out.pixel(row,col)
+            #             if outputimg.pixel(row,col) == -100:
+            #                 outputimg.set_pixel(row,col,pixvalue)
+            #             else:
+            #                 avg = (pixvalue + outputimg.pixel(row,col))/2
+            #                 outputimg.set_pixel(row,col,avg)
 
             ev_infill.Append(outputimg)
 
@@ -265,4 +311,4 @@ class UBInfillClient(Client):
     def finalize(self):
         self._inlarcv.finalize()
         self._outlarcv.finalize()
-        self._inlarlite.close()
+        # self._inlarlite.close()

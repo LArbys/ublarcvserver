@@ -7,22 +7,23 @@ from ublarcvserver import start_broker
 Start the broker and worker. Run one client. Useful for tests.
 """
 
-def start_infill_worker(broker_address, plane,device, batch_size,
+def start_infill_worker(broker_address, plane,weight_file,
+                         device, batch_size,
                          ssh_thru_server, ssh_password):
-    print batch_size,type(batch_size)
-    worker=UBInfillWorker(broker_address,plane,
+    print(batch_size,type(batch_size))
+    worker=UBInfillWorker(broker_address,plane,weight_file,
                          device,batch_size,
                          ssh_thru_server=ssh_thru_server,
                          ssh_password=ssh_password)
     worker.connect()
-    print "worker started: ",worker.idname()
+    print("worker started: ",worker.idname())
     worker.run()
 
 
-def startup_infill_workers( broker_address,
+def startup_infill_workers( broker_address,weights_file,
                              devices=["cuda","cuda","cuda"],
                              batch_size=1,
-                             nplanes=[0,1,2],
+                             nplanes=[0],
                              ssh_thru_server=None, ssh_password=None,
                              start=True):
     if type(devices) is str:
@@ -34,11 +35,11 @@ def startup_infill_workers( broker_address,
 
     # setup the worker
     pworkers = []
-    print "plans: ",nplanes
-    print "devices: ",devices
+    print("planes: ",nplanes)
+    print("devices: ",devices)
     for p,device in zip(nplanes,devices):
         pworker = Process(target=start_infill_worker,
-                          args=(broker_address,p,
+                          args=(broker_address,p,weights_file[p],
                                 device,batch_size,
                                 ssh_thru_server,ssh_password))
         pworker.daemon = True
@@ -58,11 +59,15 @@ if __name__ == "__main__":
     # endpoint:
     endpoint  = "tcp://localhost:6005"
     bindpoint = "tcp://*:6005"
+    weights_dir = "/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill/"
+    weights_files = {0:weights_dir+"/uplane_MC_40000.tar",
+                     1:weights_dir+"/vplane_MC_21500.tar",
+                     2:weights_dir+"/yplane_MC_33000.tar"}
 
     logging.basicConfig(level=logging.DEBUG)
 
     pbroker = start_broker(bindpoint)
-    pworkers = startup_infill_workers(endpoint, nplanes=[0,1,2])
+    pworkers = startup_infill_workers(endpoint, weights, nplanes=[0,1,2])
 
-    print "[ENTER] to quit."
+    print("[ENTER] to quit.")
     raw_input()

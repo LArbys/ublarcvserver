@@ -1,6 +1,8 @@
 import os,sys,logging, zlib
 import numpy as np
 from larcv import larcv
+from collections import OrderedDict
+
 from ctypes import c_int
 from ublarcvserver import MDPyWorkerBase, Broker, Client
 larcv.json.load_jsonutils()
@@ -12,7 +14,8 @@ Implements worker for Infill network
 class UBInfillWorker(MDPyWorkerBase):
 
     def __init__(self,broker_address,plane,
-                 device,batch_size,
+                 weight_file,device,batch_size,
+                 use_half=False,
                  **kwargs):
         """
         Constructor
@@ -21,6 +24,7 @@ class UBInfillWorker(MDPyWorkerBase):
         ------
         broker_address str IP address of broker
         plane int Plane ID number. Currently [0,1,2] only
+        weight_file str path to files with weights
         batch_size int number of batches to process in one pass
         """
         if type(plane) is not int:
@@ -29,6 +33,7 @@ class UBInfillWorker(MDPyWorkerBase):
             raise ValueError("unrecognized plane argument. \
                                 should be either one of [0,1,2]")
         else:
+            print("PLANE GOOD: ", plane)
             pass
 
         if type(batch_size) is not int or batch_size<0:
@@ -37,17 +42,20 @@ class UBInfillWorker(MDPyWorkerBase):
         self.plane = plane
         self.batch_size = batch_size
         self._still_processing_msg = False
+        self._use_half = use_half
+
         service_name = "infill_plane%d"%(self.plane)
 
         super(UBInfillWorker,self).__init__( service_name,
                                             broker_address, **kwargs)
 
-        self.load_model(device)
+        self.load_model(weight_file,device,self._use_half)
+
         if self.is_model_loaded():
             self._log.info("Loaded ubInfill model. Service={}"\
                             .format(service_name))
 
-    def load_model(self,device):
+    def load_model(self,weight_file,device,use_half):
         # import pytorch
         try:
             import torch
@@ -56,11 +64,8 @@ class UBInfillWorker(MDPyWorkerBase):
 
         # ----------------------------------------------------------------------
         # import model - change to my model
-        if "INFILL_MODELDIR" in os.environ: # should have been placed there by configure.sh script
-            INFILL_MODELDIR=os.environ["INFILL_MODELDIR"]
-            sys.path.append(INFILL_MODELDIR)
-        else:
-            sys.path.append("/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill")
+        sys.path.append("/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill")
+
         try:
             from ub_uresnet_infill import UResNetInfill
         except:
@@ -71,12 +76,35 @@ class UBInfillWorker(MDPyWorkerBase):
             raise ValueError("invalid device name [{}]. Must str with name \
                                 \"cpu\" or \"cuda:X\" where X=device number")
 
+
         self._log = logging.getLogger(self.idname())
 
         self.device = torch.device(device)
 
-        self.model = UResNetInfill(inplanes=32,input_channels=1,num_classes=1,showsizes=True).to(self.device)
+        map_location = None
+        self.model = UResNetInfill(inplanes=32,input_channels=1,num_classes=1,showsizes=False)
+        checkpoint = torch.load( weight_file, map_location=map_location )
+        from_data_parallel = False
+        for k,v in checkpoint["state_dict"].items():
+            if "module." in k:
+                from_data_parallel = True
+                break
+
+        if from_data_parallel:
+            new_state_dict = OrderedDict()
+            for k, v in checkpoint["state_dict"].items():
+                name = k[7:] # remove `module.`
+                new_state_dict[name] = v
+            checkpoint["state_dict"] = new_state_dict
+
+        self.model.load_state_dict(checkpoint["state_dict"])
+        self.model.to(self.device)
         self.model.eval()
+
+        # with torch.set_grad_enabled(False):
+        #    logits, probas = self.model(testset_features)
+
+        print ("Loaded Model!")
         # ----------------------------------------------------------------------
 
 
@@ -168,6 +196,7 @@ class UBInfillWorker(MDPyWorkerBase):
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
         out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
+
 
         # compression techniques
         ## 1) threshold values to zero
