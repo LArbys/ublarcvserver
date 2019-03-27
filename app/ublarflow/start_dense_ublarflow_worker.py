@@ -9,13 +9,14 @@ Provides utility function for starting worker(s).
 """
 
 def start_dense_ublarflow_worker(broker_address,flow_dir,weight_file,
-                                 device,batch_size,
+                                 device,batch_size,use_half,
                                  ssh_thru_server,ssh_password):
     """
     start single copy of dense larflow worker
     """
     worker=UBDenseLArFlowWorker(broker_address,flow_dir,weight_file,
                                 device,batch_size,
+                                use_half=use_half,
                                 ssh_thru_server=ssh_thru_server,
                                 ssh_password=ssh_password)
     worker.connect()
@@ -23,11 +24,11 @@ def start_dense_ublarflow_worker(broker_address,flow_dir,weight_file,
     worker.run()
 
 def start_daemon_ublarflow_worker(broker_address,flow_dir,weight_file,
-                                  device,batch_size,
+                                  device,batch_size,use_half,
                                   ssh_thru_server,ssh_password):
     pworker = Process(target=start_dense_ublarflow_worker,
                       args=(broker_address,flow_dir,weight_file,
-                            device,batch_size,
+                            device,batch_size,use_half,
                             ssh_thru_server,ssh_password))
     pworker.daemon = True
     pworker.start()
@@ -50,7 +51,7 @@ if __name__ == "__main__":
     pbroker = start_broker(bindpoint)
     pworker = start_daemon_ublarflow_worker(endpoint,'y2u',
                                             weights_files['y2u'],
-                                            "cpu",1,None,None)
+                                            "cpu",1,False,None,None)
 
 
     print "[ENTER] to quit."

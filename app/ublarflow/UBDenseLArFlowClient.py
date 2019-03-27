@@ -19,6 +19,7 @@ class UBDenseLArFlowClient(Client):
                  adc_producer="wire",
                  output_producer="larflow",
                  tick_backwards=False,
+                 flow_dirs=["y2u","y2v"],
                  **kwargs):
         """
         this class loads either larcv::sparseimage or larcv::image2d data from
@@ -29,7 +30,6 @@ class UBDenseLArFlowClient(Client):
         inputs
         ------
         broker_address str address of broker Socket
-        flow_dir str direction of flow. options are ["y2u","y2v"]
         larcv_supera_file str path to input data
         output_larcv_file str path to output file
 
@@ -38,6 +38,7 @@ class UBDenseLArFlowClient(Client):
         adc_producer str (default:"wire") name of ADC image2d tree
         output_producer str (default:"larflow") name of output flow info. will append flow_dir to name.
         tick_backwards bool (default:False) set to True if reading in LArCV1 files
+        flow_dirs [list of str] direction of flow. options are ["y2u","y2v"]
         """
         super(UBDenseLArFlowClient,self).__init__(broker_address,**kwargs)
 
@@ -74,6 +75,8 @@ class UBDenseLArFlowClient(Client):
         self._split_algo.configure(split_pset)
         self._split_algo.initialize()
         self._split_algo.set_verbosity(2)
+
+        self.flow_dirs = flow_dirs
 
         # we do not stitch, but store individual crops
         # the post-processor does the stitching
@@ -218,9 +221,10 @@ class UBDenseLArFlowClient(Client):
 
             got_reply["y2u"][iset] = 0
             got_reply["y2v"][iset] = 0
-            print("produced msg for img[{}]".format(iset))
-            if iset>=5:
-                break
+            print("produced msg[{}]: {}".format(iset,srcimg.meta().dump()))
+            #if iset>=5:
+            #    # truncate for debug
+            #    break
 
         # we make a flag to mark if we got this back
         imageid_received = False
@@ -228,8 +232,8 @@ class UBDenseLArFlowClient(Client):
         received_compressed = 0
         received_uncompressed = 0
         complete = True
-        for flowdir in ["y2u","y2v"]:
-            
+        for flowdir in self.flow_dirs:
+
             service_name = "ublarflow_dense_%s"%(flowdir)
             print("Send messages to service={}".format(service_name))
             self.send(service_name,*msg[flowdir])

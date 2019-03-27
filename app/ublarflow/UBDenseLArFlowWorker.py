@@ -184,9 +184,12 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
 
             # if first set of images, create numpy array
             if src_np is None:
+                imgnptype = np.float32
+                if self._use_half:
+                    imgnptype = np.float16
                 print("src_np: {}".format((self.batch_size,1,src.meta().rows(),src.meta().cols())))
-                src_np = np.zeros( (self.batch_size,1,src.meta().rows(),src.meta().cols()), dtype=np.float32 )
-                tar_np = np.zeros( (self.batch_size,1,tar.meta().rows(),tar.meta().cols()), dtype=np.float32 )
+                src_np = np.zeros( (self.batch_size,1,src.meta().rows(),src.meta().cols()), dtype=imgnptype )
+                tar_np = np.zeros( (self.batch_size,1,tar.meta().rows(),tar.meta().cols()), dtype=imgnptype )
                 set_v = []
                 meta_v = {}
 
@@ -214,7 +217,7 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
                 flow_t[ torch.lt(src_t,10.0) ] = 0.0
 
                 # convert back to image2d. only use those with setid
-                flow_np = flow_t.detach().cpu().numpy()
+                flow_np = flow_t.detach().cpu().numpy().astype(np.float32)
                 for ib,sid in enumerate(set_v):
                     # convert back to image2d
                     flow_v[sid] = larcv.as_image2d_meta(flow_np[ib,0,:,:],meta_v[sid])
