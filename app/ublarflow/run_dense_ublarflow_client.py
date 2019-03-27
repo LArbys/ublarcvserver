@@ -20,16 +20,17 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     pbroker = start_broker(bindpoint)
+    use_half = True
     pworker_y2u = start_daemon_ublarflow_worker(endpoint,'y2u',weights_files['y2u'],
-                                            "cuda",1,True,None,None)
-    #pworker_y2v = start_daemon_ublarflow_worker(endpoint,'y2v',weights_files['y2v'],
-    #                                        "cuda",1,None,None)
+                                                "cuda",1,use_half,None,None)
+    pworker_y2v = start_daemon_ublarflow_worker(endpoint,'y2v',weights_files['y2v'],
+                                                "cuda",1,use_half,None,None)
 
     client = UBDenseLArFlowClient(endpoint,
                                   supera_larcv_filename,
                                   output_larcv_filename,
                                   adc_producer="wiremc",
-                                  flow_dirs=["y2u"],
+                                  flow_dirs=["y2u","y2v"],
                                   tick_backwards=True)
 
     client.connect()

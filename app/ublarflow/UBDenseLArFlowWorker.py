@@ -81,6 +81,7 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
         self.device = torch.device(device)
         self.model = load_dense_model(weight_file,device=device,
                                         use_half=self._use_half ).to(self.device)
+        self.model.eval()
 
     def make_reply(self,request,nreplies):
         """
@@ -211,7 +212,8 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
                 # convert to torch and run the batch through the network
                 src_t  = torch.from_numpy(src_np).to(self.device)
                 tar_t  = torch.from_numpy(tar_np).to(self.device)
-                flow_t, visi_t = self.model( src_t, tar_t )
+                with torch.set_grad_enabled(False):
+                    flow_t, visi_t = self.model( src_t, tar_t )
 
                 # repress flow_t for values below threshold
                 flow_t[ torch.lt(src_t,10.0) ] = 0.0
