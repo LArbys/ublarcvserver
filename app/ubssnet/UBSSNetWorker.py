@@ -168,7 +168,8 @@ class UBSSNetWorker(MDPyWorkerBase):
 
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
-        out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
+        with torch.set_grad_enabled(False):
+            out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
 
         # remove background values
         out_batch_np = out_batch_np[:,1:,:,:]
