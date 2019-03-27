@@ -23,7 +23,7 @@ def start_infill_worker(broker_address, plane,weight_file,
 def startup_infill_workers( broker_address,weights_file,
                              devices=["cuda","cuda","cuda"],
                              batch_size=1,
-                             nplanes=[0],
+                             nplanes=[0,1,2],
                              ssh_thru_server=None, ssh_password=None,
                              start=True):
     if type(devices) is str:

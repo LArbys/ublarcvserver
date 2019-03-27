@@ -1,4 +1,5 @@
 from __future__ import print_function
+import numpy
 
 import logging
 from ublarcvserver import Client
@@ -149,6 +150,7 @@ class UBInfillClient(Client):
                                self._inlarcv.event_id().event())
 
         self._outlarcv.save_entry()
+        print("SAVED ENTRY")
         return True
 
 
@@ -263,43 +265,98 @@ class UBInfillClient(Client):
         ev_infill = self._outlarcv.\
                         get_data(larcv.kProductImage2D,
                                  self._infill_tree_name)
+        ev_input = self._outlarcv.\
+                        get_data(larcv.kProductImage2D,
+                                self._adc_producer)
 
         for p in xrange(nplanes):
 
             outputimg = larcv.Image2D( wholeview_v.at(p).meta() )
-            # print("outputimg MIN_X: ",outputimg.meta().min_x())
-            # print("outputimg MAX_X: ",outputimg.meta().max_x())
-            # print("outputimg MIN_Y: ",outputimg.meta().min_y())
-            # print("outputimg MAX_Y: ",outputimg.meta().max_y())
-            # print()
-            # outputimg.paint(0)
-            outputimg.paint(-100)
-            nimgsets = len(outimg_v[p])/2
+            outputimg.paint(0)
+
+            # overlapcountimg = larcv.Image2D( wholeview_v.at(p).meta() )
+            # overlapcountimg.paint(0)
+
+            nimgsets = len(outimg_v[p])
 
             for iimgset in xrange(nimgsets):
                 out = outimg_v[p][iimgset]
                 outputimg.overlay(out,larcv.Image2D.kOverWrite)
 
-            # pseudocode for overlay with overlap
+            # pseudocode for overlay with overlap  - like overlay but more complicated
+            # output_meta=outputimg.meta()
+            #
             # for iimgset in xrange(nimgsets):
-            #     print("MIN_X: ",i.meta().min_x())
-            #     print("MAX_X: ",i.meta().max_x())
-            #     print("MIN_Y: ",i.meta().min_y())
-            #     print("MAX_Y: ",i.meta().max_y())
-            #     print()
-            #     out = outimg_v[p][iimgset]
-            #     # assuming meta info retained...
-            #     # if not, get info from BBox maybe?
-            #     for row in range(out.meta().min_y(),out.meta().max_y()):
-            #         for col in range(out.meta().min_x(),out.meta().max_x()):
-            #             pixvalue = out.pixel(row,col)
-            #             if outputimg.pixel(row,col) == -100:
-            #                 outputimg.set_pixel(row,col,pixvalue)
-            #             else:
-            #                 avg = (pixvalue + outputimg.pixel(row,col))/2
-            #                 outputimg.set_pixel(row,col,avg)
+            #
+            #     crop_meta=outimg_v[p][iimgset].meta()
+            #
+            #     x_min = max(output_meta.min_x(),crop_meta.min_x())
+            #     x_max = min(output_meta.max_x(),crop_meta.max_x())
+            #     y_min = max(output_meta.min_y(),crop_meta.min_y())
+            #     y_max = min(output_meta.max_y(),crop_meta.max_y())
+            #
+            #     row_min1 = output_meta.row(y_min)
+            #     col_min1 = output_meta.col(x_min)
+            #
+            #     # print("Output Meta")
+            #     # print("minx,maxx,miny,maxy: ",output_meta.min_x(),output_meta.max_x(),output_meta.min_y(),output_meta.max_y())
+            #     # print("")
+            #     row_min2 = crop_meta.row(y_min)
+            #     col_min2 = crop_meta.col(x_min)
+            #     # print("row_min1: ",row_min1)
+            #     # print("row_min2: ",row_min2)
+            #     # print("")
+            #     # print("col_min1: ",col_min1)
+            #     # print("col_min2: ",col_min2)
+            #     # print("")
+            #     # print("row_max1: ",output_meta.row(y_max))
+            #     # print("row_max2: ",crop_meta.row(y_max))
+            #     # print("")
+            #     # print("col_max1: ",output_meta.col(x_max))
+            #     # print("col_max2: ",crop_meta.col(x_max))
+            #
+            #     nrows = (y_max - y_min) / output_meta.pixel_height()
+            #     ncols = (x_max - x_min) / output_meta.pixel_width()
+            #     # print("nrows: ",nrows)
+            #     # print("ncols: ",ncols)
+            #
+            #     # img2 = outimg_v[p][iimgset].as_vector()
+            #
+            #     for col_index in range(0,int(ncols-1)):
+            #         for row_index in range(0,int(nrows-1)):
+            #
+            #             newvalue = outimg_v[p][iimgset].pixel(row_index+row_min2, col_index+col_min2)
+            #             original = outputimg.pixel(row_index+row_min1, col_index+col_min1)
+            #             overlapcount = overlapcountimg.pixel(row_index+row_min1, col_index+col_min1)
+            #             outputimg.set_pixel(row_index+row_min1, col_index+col_min1, newvalue+original)
+            #             # index1 = output_meta.index(row_min1,col_min1+col_index)
+            #             # index2 = crop_meta.index(row_min2,col_min2+col_index)
+            #             # outputimg[index1+row_index] += img2[index2+row_index]
+            #             overlapcountimg.set_pixel(row_index+row_min1, col_index+col_min1, overlapcount+1.0)
+            #
+            #
+            # x_min = output_meta.min_x()
+            # x_max = output_meta.max_x()
+            # y_min = output_meta.min_y()
+            # y_max = output_meta.max_y()
+            #
+            # row_min = output_meta.row(y_min)
+            # col_min = output_meta.col(x_min)
+            #
+            # nrows = (y_max - y_min) / output_meta.pixel_height()
+            # ncols = (x_max - x_min) / output_meta.pixel_width()
+            #
+            # for col_index in range(0,int(ncols)):
+            #     for row_index in range(0,int(nrows)):
+            #         original = outputimg.pixel(row_index+row_min1, col_index+col_min1)
+            #         overlapcount = overlapcountimg.pixel(row_index+row_min1, col_index+col_min1)
+            #         if overlapcount > 0:
+            #             outputimg.set_pixel(row_index+row_min1, col_index+col_min1, original/overlapcount)
+
 
             ev_infill.Append(outputimg)
+            ev_input.Append(wholeview_v.at(p))
+
 
     def process_entries(self,start=0, end=-1):
         if end<0:

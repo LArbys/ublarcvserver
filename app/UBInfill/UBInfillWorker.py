@@ -65,12 +65,13 @@ class UBInfillWorker(MDPyWorkerBase):
         # ----------------------------------------------------------------------
         # import model - change to my model
         sys.path.append("/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill")
+        from ub_uresnet_infill import UResNetInfill
 
-        try:
-            from ub_uresnet_infill import UResNetInfill
-        except:
-            raise RuntimeError("could not load Infill model. did you remember"
-                            +" to setup?")
+        # try:
+        #     from ub_uresnet_infill import UResNetInfill
+        # except:
+        #     raise RuntimeError("could not load Infill model. did you remember"
+        #                     +" to setup?")
 
         if "cuda" not in device and "cpu" not in device:
             raise ValueError("invalid device name [{}]. Must str with name \
@@ -195,7 +196,8 @@ class UBInfillWorker(MDPyWorkerBase):
 
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
-        out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
+        out_batch_np = img2d_batch_t.detach().cpu().numpy()
+        # out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
 
 
         # compression techniques
@@ -207,8 +209,8 @@ class UBInfillWorker(MDPyWorkerBase):
         out_batch_np[ out_batch_np<1.0e-3 ] = 0.0
 
         # threshold
-        for ich in xrange(out_batch_np.shape[1]):
-            out_batch_np[:,ich,:,:][ img_batch_np[:,0,:,:]<10.0 ] = 0.0
+        # for ich in xrange(out_batch_np.shape[1]):
+        #     out_batch_np[:,ich,:,:][ img_batch_np[:,0,:,:]<10.0 ] = 0.0
 
         # convert back to full precision, if we used half-precision in the net
 
