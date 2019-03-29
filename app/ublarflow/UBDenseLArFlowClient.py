@@ -19,6 +19,7 @@ class UBDenseLArFlowClient(Client):
                  adc_producer="wire",
                  output_producer="larflow",
                  tick_backwards=False,
+                 save_cropped_adc=False,
                  flow_dirs=["y2u","y2v"],
                  **kwargs):
         """
@@ -38,6 +39,7 @@ class UBDenseLArFlowClient(Client):
         adc_producer str (default:"wire") name of ADC image2d tree
         output_producer str (default:"larflow") name of output flow info. will append flow_dir to name.
         tick_backwards bool (default:False) set to True if reading in LArCV1 files
+        save_cropped_adc bool (default:False) save the ADC crops
         flow_dirs [list of str] direction of flow. options are ["y2u","y2v"]
         """
         super(UBDenseLArFlowClient,self).__init__(broker_address,**kwargs)
@@ -143,7 +145,7 @@ class UBDenseLArFlowClient(Client):
                                         self._inlarcv.event_id().subrun(),
                                         self._inlarcv.event_id().event())
 
-        self.store_replies(flow_v)
+        self.store_replies(flow_v, crop_v)
 
         self._outlarcv.set_id( self._inlarcv.event_id().run(),
                                self._inlarcv.event_id().subrun(),
@@ -290,19 +292,23 @@ class UBDenseLArFlowClient(Client):
                         %(received_compressed/1.0e6, received_uncompressed/1.0e6))
         return imgout_v
 
-    def store_replies(self, flowdict):
+    def store_replies(self, flowdict, crop_v):
         """ receive the list of images from the worker """
         for flowdir in ["y2u","y2v"]:
             evimg_output = self._outlarcv.\
                             get_data(larcv.kProductImage2D,
                                      self._output_producer+"_"+flowdir)
+            evadc_output = self._outlarcv.\
+                get_data(larcv.kProductImage2D,"adc")
             flowimgs = flowdict[flowdir]
             keys = flowimgs.keys()
             keys.sort()
             for iimg in keys:
                 flowimg = flowimgs[iimg].front()
                 evimg_output.Append(flowimg)
-
+                for i in xrange(3):
+                    evadc_output.Append( crop_v.at(3*iimg+i) )
+                
         return True
 
     def process_entries(self,start=0, end=-1):
