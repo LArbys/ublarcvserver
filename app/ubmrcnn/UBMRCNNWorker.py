@@ -88,6 +88,10 @@ class UBMRCNNWorker(MDPyWorkerBase):
         self.batch_size = batch_size
         self._still_processing_msg = False
         self._use_half = use_half
+        if self._use_half:
+            print("Using half of mrcnn not tested")
+            assert 1==2
+
         service_name = "ubmrcnn_plane%d"%(self.plane)
 
         super(UBMRCNNWorker,self).__init__( service_name,
@@ -99,8 +103,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
         #                     .format(service_name))
 
         #Get Configs going:
-
-        dataset = datasets.get_particle_dataset()
+        self.dataset = datasets.get_particle_dataset()
         cfg.TRAIN.DATASETS = ('particle_physics_train')
         cfg.MODEL.NUM_CLASSES = 7
 
@@ -110,13 +113,21 @@ class UBMRCNNWorker(MDPyWorkerBase):
         assert_and_infer_cfg()
 
         #MRCNN Load:
-        maskRCNN = Generalized_RCNN()
-        maskRCNN.cuda()
-        checkpoint = torch.load(weight_file, map_location=lambda storage, loc: storage)
-        net_utils.load_ckpt(maskRCNN, checkpoint['model'])
+        # maskRCNN = Generalized_RCNN()
+        # maskRCNN.cuda()
+        # checkpoint = torch.load(weight_file, map_location=lambda storage, loc: storage)
+        # net_utils.load_ckpt(maskRCNN, checkpoint['model'])
+        self.load_model(weight_file,device,self._use_half)
+        if self.is_model_loaded():
+            self._log.info("Loaded ubMRCNN model. Service={}"\
+                            .format(service_name))
+
 
     def load_model(self,weight_file,device,use_half):
         # import pytorch
+        self._log.info("load_model does not use device, or use_half in MRCNN")
+        print(device)
+
         try:
             import torch
         except:
@@ -128,7 +139,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
             # from ubmrcnn import ubMRCNN
         except:
             raise RuntimeError("could not load ubMRCNN model. did you remember"
-                            +" to setup pytorch-uresnet?")
+                            +" to setup everything?")
 
         if "cuda" not in device and "cpu" not in device:
             raise ValueError("invalid device name [{}]. Must str with name \
@@ -137,10 +148,19 @@ class UBMRCNNWorker(MDPyWorkerBase):
         self._log = logging.getLogger(self.idname())
 
         self.device = torch.device(device)
-        if not self._use_half:
-            self.model = ubMRCNN(weight_file).to(self.device)
-        else:
-            self.model = ubMRCNN(weight_file).half().to(self.device)
+
+        # if not self._use_half:
+        #     self.model = ubMRCNN(weight_file).to(self.device)
+        # else:
+        #     self.model = ubMRCNN(weight_file).half().to(self.device)
+        # self.model.eval()
+
+        self.model = Generalized_RCNN()
+        self.model.cuda()
+        checkpoint = torch.load(weight_file, map_location=lambda storage, loc: storage)
+        net_utils.load_ckpt(self.model, checkpoint['model'])
+        self.model = mynn.DataParallel(self.model, cpu_keywords=['im_info', 'roidb'],
+                                     minibatch=True, device_ids=[0])  # only support single GPU
         self.model.eval()
 
 
@@ -176,7 +196,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
         rseid_v = []
         for imsg in xrange(self._next_msg_id,nmsgs):
             try:
-                compressed_data = str(request[imsg])
+                compressed_data = bytes(request[imsg])
                 data = zlib.decompress(compressed_data)
                 c_run = c_int()
                 c_subrun = c_int()
@@ -222,7 +242,6 @@ class UBMRCNNWorker(MDPyWorkerBase):
             np_dtype = np.float16
         img_batch_np = np.zeros( (nimgs,1,sizes[0][0],sizes[0][1]),
                                     dtype=np_dtype )
-
         for iimg,img2d in enumerate(img2d_v):
             meta = img2d.meta()
             img2d_np = larcv.as_ndarray( img2d )\
@@ -231,12 +250,79 @@ class UBMRCNNWorker(MDPyWorkerBase):
                 img_batch_np[iimg,:] = img2d_np
             else:
                 img_batch_np[iimg,:] = img2d_np.as_type(np.float16)
+    #
 
-        # now make into torch tensor
-        img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
-        out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
+        # print()
+        # print('img_batch_np', img_batch_np.shape)
+        # print()
+        clustermasks_all_imgs = []
+        mask_count = 0
+        for img_num in range(img_batch_np.shape[0]):
+            meta = img2d_v[img_num].meta()
+            height = img_batch_np.shape[2]
+            width = img_batch_np.shape[3]
+            im = np.zeros ((width,height,3))
+            im_visualize = np.zeros ((width,height,3), 'float32')
+            for h in range(img_batch_np.shape[2]):
+                for w in range(img_batch_np.shape[3]):
+                    value = img_batch_np[img_num][0][h][w]
+                    im[w][h][:] = value
+
+                    if value > 255:
+                        value2 =250
+                    elif value < 0:
+                        value2 =0
+                    else:
+                        value2  = value
+                    im_visualize[w][h][:]= value2
+
+            assert im is not None
+            print("type im", type(im))
+            thresh = 0.7
+            print("Using a score threshold of 0.7 to cut boxes. Hard Coded")
+            clustermasks_this_img = []
+            cls_boxes, cls_segms, cls_keyps, round_boxes = im_detect_all(self.model, im, timers=None, use_polygon=False)
+            np.set_printoptions(suppress=True)
+            for cls in range(len(cls_boxes)):
+                assert len(cls_boxes[cls]) == len(cls_segms[cls])
+                assert len(cls_boxes[cls]) == len(round_boxes[cls])
+                for roi in range(len(cls_boxes[cls])):
+                    if cls_boxes[cls][roi][4] > thresh:
+                        segm_coo = cls_segms[cls][roi].tocoo()
+                        non_zero_num = segm_coo.count_nonzero()
+                        segm_np = np.zeros((non_zero_num, 2), dtype=np.float32)
+                        counter = 0
+                        for i,j,v in zip(segm_coo.row, segm_coo.col, segm_coo.data):
+                            segm_np[counter][0] = j
+                            segm_np[counter][1] = i
+                            counter = counter+1
+                        round_box = np.array(round_boxes[cls][roi], dtype=np.float32)
+                        round_box = np.append(round_box, np.array([cls], dtype=np.float32))
+
+
+
+                        clustermasks_this_img.append(larcv.as_clustermask(segm_np, round_box, meta))
+                        mask_count = mask_count + 1
+                        ### Checks to make sure the clustermasks being placed
+                        ### in the list have the appropriate values relative
+                        ### to what we send the pyutil
+                        # cmask = clustermasks_this_img[len(list_clustermasks)-1]
+                        # print()
+                        # print(round_box)
+                        # print("Segm shape", segm_np.shape)
+                        # print(segm_np[0][0] , segm_np[0][1])
+                        # print(segm_np[1][0] , segm_np[1][1])
+                        # print()
+                        # print(cmask.box.min_x(), cmask.box.min_y(), "   ", cmask.box.max_x(), cmask.box.max_y(), "    " , cmask.type)
+                        # print(cmask._box.at(0), cmask._box.at(1), "   ", cmask._box.at(2), cmask._box.at(3), "    " , cmask._box.at(4))
+                        # print("points_v len", len(cmask.points_v))
+                        # print(cmask.points_v.at(0).x, cmask.points_v.at(0).y)
+                        # print(cmask.points_v.at(1).x, cmask.points_v.at(1).y)
+            clustermasks_all_imgs.append(clustermasks_this_img)
 
         # remove background values
+        out_batch_np = img_batch_np
+        # print("type(out_batch_np)", type(out_batch_np))
         out_batch_np = out_batch_np[:,1:,:,:]
 
         # compression techniques
@@ -244,34 +330,41 @@ class UBMRCNNWorker(MDPyWorkerBase):
         ## 2) suppress output for non-adc values
         ## 3) use half
 
-        # suppress small values
-        out_batch_np[ out_batch_np<1.0e-3 ] = 0.0
-
-        # threshold
-        for ich in xrange(out_batch_np.shape[1]):
-            out_batch_np[:,ich,:,:][ img_batch_np[:,0,:,:]<10.0 ] = 0.0
+        # # suppress small values
+        # out_batch_np[ out_batch_np<1.0e-3 ] = 0.0
+        #
+        # # threshold
+        # for ich in xrange(out_batch_np.shape[1]):
+        #     out_batch_np[:,ich,:,:][ img_batch_np[:,0,:,:]<10.0 ] = 0.0
 
         # convert back to full precision, if we used half-precision in the net
         if self._use_half:
             out_batch_np = out_batch_np.as_type(np.float32)
 
 
-        self._log.debug("passed images through net. output batch shape={}"
-                        .format(out_batch_np.shape))
+        self._log.debug("passed images through net. Number of images = {} total masks across all images = {}"
+                        .format(len(clustermasks_all_imgs), mask_count))
         # convert from numpy array batch back to image2d and messages
+        # print("out_batch_np.shape",out_batch_np.shape)
+        # out_batch_np = np.zeros((1,1,3456,1008),dtype=np.float32)
         reply = []
-        for iimg in xrange(out_batch_np.shape[0]):
-            img2d = img2d_v[iimg]
+        for idx in xrange(len(clustermasks_all_imgs)):
+            print("first loop through the images")
+            clustermask_set = clustermasks_all_imgs[idx]
             rseid = rseid_v[iimg]
-            meta  = img2d.meta()
-            for ich in xrange(out_batch_np.shape[1]):
-                out_np = out_batch_np[iimg,ich,:,:]
-                out_img2d = larcv.as_image2d_meta( out_np, meta )
-                bson = larcv.json.as_pybytes( out_img2d,
+
+            for mask_idx in xrange(len(clustermask_set)):
+                print("         second loop, go through all the masks in the image")
+                mask = clustermask_set[mask_idx]
+                meta  = mask.meta
+                # print((meta.dump()))
+                # print(type(mask))
+                # out_img2d = larcv.as_image2d_meta( out_np.reshape((1008,3456)), meta )
+                bson = larcv.json.as_pybytes( mask,
                                     rseid[0], rseid[1], rseid[2], rseid[3] )
                 compressed = zlib.compress(bson)
                 reply.append(compressed)
-
+        print("len(reply)", len(reply))
         if self._next_msg_id>=nmsgs:
             isfinal = True
             self._still_processing_msg = False

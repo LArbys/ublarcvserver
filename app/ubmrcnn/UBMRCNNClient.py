@@ -131,8 +131,7 @@ class UBMRCNNClient(Client):
             for plane in range(nplanes):
                 img2d_v[plane] = [wholeview_v.at(plane)]
 
-        for k,v in img2d_v.items():
-            print("Plane:", k, " type of value:", type(v))
+
 
 
         # send messages
@@ -185,7 +184,7 @@ class UBMRCNNClient(Client):
                 # we make a flag to mark if we got this back
                 imageid_received[img_id] = False
                 nimages_sent += 1
-            self.send("ubmrcnn_plane%d"%(p),*msg)
+            self.send(b"ubmrcnn_plane%d"%(p),*msg)
 
             # receives
             isfinal = False
@@ -198,8 +197,11 @@ class UBMRCNNClient(Client):
                 self._log.debug("num frames received from worker: {}"
                                 .format(len(workerout)))
                 # use the time worker is preparing next part, to convert image
+                count =0
                 for reply in workerout:
-                    data = str(reply)
+                    print(count)
+                    count=count+1
+                    data = bytes(reply)
                     received_compressed += len(data)
                     data = zlib.decompress(data)
                     received_uncompressed += len(data)
@@ -207,8 +209,11 @@ class UBMRCNNClient(Client):
                     c_subrun = c_int()
                     c_event = c_int()
                     c_id = c_int()
-                    replyimg = larcv.json.image2d_from_pybytes(data,
+                    print("I expect this much at least")
+                    replymask = larcv.json.clustermask_from_pybytes(data,
                                 c_run, c_subrun, c_event, c_id )
+
+
                         #byref(c_run),byref(c_subrun),byref(c_event),byref(c_id))
                     rep_rse = (c_run.value,c_subrun.value,
                                 c_event.value)
@@ -225,14 +230,15 @@ class UBMRCNNClient(Client):
                     self._log.debug("received image with correct rseid={}"
                                         .format(rep_rse))
 
-                    imgout_v[p].append(replyimg)
+                    imgout_v[p].append(replymask)
                 self._log.debug("running total, converted plane[{}] images: {}"
                                 .format(p,len(imgout_v[p])))
             complete = True
             # should be a multiple of 2: (shower,track)
-            if len(imgout_v[p])>0 and len(imgout_v[p])%2!=0:
-                complete = False
+            # if len(imgout_v[p])>0 and len(imgout_v[p])%2!=0:
+            #     complete = False
             # should have got all images back
+            print(imageid_received)
             for id,received in imageid_received.items():
                 if not received:
                     complete = False

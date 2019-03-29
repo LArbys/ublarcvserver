@@ -1,6 +1,6 @@
 #!/bin/bash
 
-home=$PWD
+home_dir=$PWD
 
 # LIBTORCH
 export LIBTORCH_LIBDIR="/home/jmills/.local/lib/python3.5/site-packages/torch/lib"
@@ -11,7 +11,7 @@ export LIBTORCH_LIBDIR="/home/jmills/.local/lib/python3.5/site-packages/torch/li
 source /home/twongj01/software/root6/python3build/bin/thisroot.sh
 
 # LARCV
-cd /home/jmills/workdir/ubdl
+cd /home/jmills/workdir/ubdl/
 source configure.sh
 
-cd $home
+cd $home_dir

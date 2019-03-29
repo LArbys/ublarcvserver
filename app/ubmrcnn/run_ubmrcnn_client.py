@@ -38,7 +38,7 @@ if __name__ == "__main__":
     client.connect()
 
     client.process_entry(1)
-
+    # client.process_entries()
     client.finalize()
 
     print("[ENTER] to quit.")
