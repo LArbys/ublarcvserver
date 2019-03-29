@@ -5,6 +5,8 @@ from ctypes import c_int
 from ublarcvserver import MDPyWorkerBase, Broker, Client
 larcv.json.load_jsonutils()
 
+import cv2
+
 """
 Implements worker for Sparse LArFlow network
 """
@@ -146,7 +148,7 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
                 img2dset_v[imgid] = []
                 rseid_v[imgid]=(c_run.value,c_subrun.value,c_event.value,imgid)
             img2d_v = imgdata.as_Image2D()
-            print(img2d_v.front().meta().dump())
+            #print(img2d_v.front().meta().dump())
             imgset_v[imgid].append( img2d_v.front() )
             img2dset_v[imgid].append(img2d_v)
 
@@ -188,7 +190,7 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
                 imgnptype = np.float32
                 if self._use_half:
                     imgnptype = np.float16
-                print("src_np: {}".format((self.batch_size,1,src.meta().rows(),src.meta().cols())))
+                #print("src_np: {}".format((self.batch_size,1,src.meta().rows(),src.meta().cols())))
                 src_np = np.zeros( (self.batch_size,1,src.meta().rows(),src.meta().cols()), dtype=imgnptype )
                 tar_np = np.zeros( (self.batch_size,1,tar.meta().rows(),tar.meta().cols()), dtype=imgnptype )
                 set_v = []
@@ -222,7 +224,10 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
                 flow_np = flow_t.detach().cpu().numpy().astype(np.float32)
                 for ib,sid in enumerate(set_v):
                     # convert back to image2d
-                    flow_v[sid] = larcv.as_image2d_meta(flow_np[ib,0,:,:],meta_v[sid])
+                    #flow_v[sid] = larcv.as_image2d_meta(src_np[ib,0,:,:],meta_v[sid])
+                    cv2.imwrite( "dump_flow_%d.png"%(sid), flow_np[ib,0,:,:] )
+                    cv2.imwrite( "dump_src_%d.png"%(sid),  src_np[ib,0,:,:].astype(np.float32) )
+                    flow_v[sid] = larcv.as_image2d_meta( np.transpose(flow_np[ib,0,:,:], (1,0)), meta_v[sid] )
 
                 # reset batch variables
                 set_v = []
