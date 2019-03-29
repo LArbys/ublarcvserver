@@ -37,8 +37,8 @@ def start_daemon_ublarflow_worker(broker_address,plane,weight_file,
 if __name__ == "__main__":
 
     # endpoint:
-    endpoint  = "tcp://localhost:6005"
-    bindpoint = "tcp://*:6005"
+    endpoint  = "tcp://localhost:6666"
+    bindpoint = "tcp://*:6666"
     weights_dir = "../../networks/larflow/weights/"
     weights_files = {2:weights_dir+"/checkpoint.500th.tar"}
 

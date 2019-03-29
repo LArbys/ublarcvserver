@@ -39,11 +39,16 @@ def start_daemon_ublarflow_worker(broker_address,flow_dir,weight_file,
 if __name__ == "__main__":
 
     # endpoint:
-    endpoint  = "tcp://localhost:6005"
-    bindpoint = "tcp://*:6005"
+    endpoint  = "tcp://localhost:6666"
+    bindpoint = "tcp://*:6666"
     weights_dir = "../../networks/larflow/weights/"
     weights_files = {"y2u":weights_dir+"/devfiltered_larflow_y2u_832x512_32inplanes.tar",
                      "y2v":weights_dir+"/devfiltered_larflow_y2v_832x512_32inplanes.tar"}
+    
+    if len(sys.argv)==2:
+        device = sys.argv[1]
+    else:
+        device = "cuda"
 
 
     logging.basicConfig(level=logging.DEBUG)
@@ -51,10 +56,13 @@ if __name__ == "__main__":
     pbroker = start_broker(bindpoint)
     pworker = start_daemon_ublarflow_worker(endpoint,'y2u',
                                             weights_files['y2u'],
-                                            "cpu",1,False,None,None)
+                                            device,1,False,None,None)
+    pworker = start_daemon_ublarflow_worker(endpoint,'y2v',
+                                            weights_files['y2v'],
+                                            device,1,False,None,None)
 
 
-    print "[ENTER] to quit."
+    print "[CTRL+C] to quit."
     while True:
         time.sleep(1)
-        raw_input()
+        
