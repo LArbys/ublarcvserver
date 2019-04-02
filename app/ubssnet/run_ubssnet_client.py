@@ -26,8 +26,9 @@ if __name__ == "__main__":
                                         devices="cuda",nplanes=[0,1,2],
                                         batch_size=1)
 
-    client = UBSSNetClient(endpoint,larcv_supera_file,"wire",
+    client = UBSSNetClient(endpoint,larcv_supera_file,
                             output_larcv_filename,
+                            adc_producer="wire",
                             larlite_opreco_file=larlite_opreco_file,
                             apply_opflash_roi=True, tick_backwards=True)
     client.connect()
