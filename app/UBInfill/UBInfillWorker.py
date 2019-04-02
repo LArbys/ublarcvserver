@@ -196,8 +196,8 @@ class UBInfillWorker(MDPyWorkerBase):
 
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
-        out_batch_np = img2d_batch_t.detach().cpu().numpy()
-        # out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
+        # out_batch_np = img2d_batch_t.detach().cpu().numpy()
+        out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
 
 
         # compression techniques
@@ -224,6 +224,8 @@ class UBInfillWorker(MDPyWorkerBase):
             meta  = img2d.meta()
             for ich in xrange(out_batch_np.shape[1]):
                 out_np = out_batch_np[iimg,ich,:,:]
+                # print("out_np",type(out_np))
+                # print("meta",type(meta))
                 out_img2d = larcv.as_image2d_meta( out_np, meta )
                 bson = larcv.json.as_pystring( out_img2d,
                                     rseid[0], rseid[1], rseid[2], rseid[3] )

@@ -18,8 +18,9 @@ class UBInfillClient(Client):
     def __init__(self, broker_address,
                     larcv_supera_file,
                     output_larcv_filename,
-                    adc_producer="wire",
-                    tick_backwards=False, infill_tree_name="infill",**kwargs):
+                    adc_producer="wire", chstatus_producer="wire",
+                    tick_backwards=True, infill_tree_name="infill",
+                    labels_tree_name="labels",**kwargs):
         """
         """
         super(UBInfillClient,self).__init__(broker_address,**kwargs)
@@ -40,7 +41,9 @@ class UBInfillClient(Client):
 
         FixedCROIFromFlash = ublarcvapp.UBSplitDetector
         self._infill_tree_name  = infill_tree_name
-        self._adc_producer     = adc_producer
+        self._adc_producer      = adc_producer
+        self._chstatus_producer = chstatus_producer
+        self._labels_tree_name  = labels_tree_name
 
         self._ubsplitdet = None
 
@@ -61,7 +64,11 @@ class UBInfillClient(Client):
         # get data
         ev_wholeview = self._inlarcv.get_data(larcv.kProductImage2D,
                                               self._adc_producer)
+        ev_chstatus = self._inlarcv.get_data(larcv.kProductChStatus,
+                                                self._chstatus_producer)
         wholeview_v = ev_wholeview.Image2DArray()
+        print("Wholeview meta: ",wholeview_v[0].meta().dump())
+        labels_v = ev_wholeview.Image2DArray()
         nplanes = wholeview_v.size()
         run    = self._inlarcv.event_id().run()
         subrun = self._inlarcv.event_id().subrun()
@@ -91,8 +98,9 @@ class UBInfillClient(Client):
         DebugImage: false
         MaxImages: -1
         RandomizeCrops: false
-        MaxRandomAttempts: 50
+        MaxRandomAttempts: 4
         MinFracPixelsInCrop: -0.0001
+        TickForward: true
         """
 
         fcfg = open("ubsplit.cfg",'w')
@@ -117,6 +125,9 @@ class UBInfillClient(Client):
 
         algo.process( wholeview_v,img2d_v,bbox_v )
 
+        print("crop meta: ",img2d_v[0].meta().dump())
+
+        # seperate by planes
         for i in img2d_v:
             p = i.meta().plane()
             if p == 0:
@@ -130,10 +141,6 @@ class UBInfillClient(Client):
         img2d_list.append(img2dv)
         img2d_list.append(img2dy)
 
-
-        # planes = img2d_v.keys()
-        # planes.sort()
-        # print "Number of images on each plane:"
         for plane in img2d_list:
             print("In list" , len(plane))
 
@@ -142,7 +149,7 @@ class UBInfillClient(Client):
         # (send crops to worker to go through network)
         replies = self.send_image_list(img2d_list,run=run,subrun=subrun,event=event)
         print ("FINISHED SEND STEP")
-        self.process_received_images(wholeview_v,replies)
+        self.process_received_images(wholeview_v,labels_v,ev_chstatus,replies)
         print ("FINISHED PROCESS STEP")
 
         self._outlarcv.set_id( self._inlarcv.event_id().run(),
@@ -170,11 +177,9 @@ class UBInfillClient(Client):
         imageid_received = {}
         nimages_sent = 0
         for p in planes:
+            print("plane ", p)
             if p not in imgout_v:
                 imgout_v[p] = []
-
-            #if p not in [2]:
-            #    continue
 
 
             self._log.info("sending images in plane[{}]: num={}."
@@ -257,9 +262,9 @@ class UBInfillClient(Client):
                         %(received_compressed/1.0e6, received_uncompressed/1.0e6))
         return imgout_v
 
-    def process_received_images(self, wholeview_v, outimg_v):
+    def process_received_images(self, wholeview_v,labels_v,ev_chstatus, outimg_v):
         """ receive the list of images from the worker """
-        # this is where I'll want to stitch the images together
+        # this is where we stitch the crops together
         nplanes = wholeview_v.size()
 
         ev_infill = self._outlarcv.\
@@ -268,94 +273,91 @@ class UBInfillClient(Client):
         ev_input = self._outlarcv.\
                         get_data(larcv.kProductImage2D,
                                 self._adc_producer)
+        ev_labels = self._outlarcv.\
+                        get_data(larcv.kProductImage2D,
+                                self._labels_tree_name)
 
         for p in xrange(nplanes):
 
+            # create final output image
             outputimg = larcv.Image2D( wholeview_v.at(p).meta() )
             outputimg.paint(0)
 
-            # overlapcountimg = larcv.Image2D( wholeview_v.at(p).meta() )
-            # overlapcountimg.paint(0)
+            # labels image to mark dead channels for overlay
+            labelsimg = larcv.Image2D( labels_v.at(p).meta() )
+            labelsimg.paint(0.0)
+
+            # temp image to use for averaging later
+            overlapcountimg = larcv.Image2D( wholeview_v.at(p).meta() )
+            overlapcountimg.paint(0)
 
             nimgsets = len(outimg_v[p])
+            output_meta=outputimg.meta()
 
+            # loop through all crops to stitch onto overlay image
             for iimgset in xrange(nimgsets):
-                out = outimg_v[p][iimgset]
-                outputimg.overlay(out,larcv.Image2D.kOverWrite)
 
-            # pseudocode for overlay with overlap  - like overlay but more complicated
-            # output_meta=outputimg.meta()
-            #
-            # for iimgset in xrange(nimgsets):
-            #
-            #     crop_meta=outimg_v[p][iimgset].meta()
-            #
-            #     x_min = max(output_meta.min_x(),crop_meta.min_x())
-            #     x_max = min(output_meta.max_x(),crop_meta.max_x())
-            #     y_min = max(output_meta.min_y(),crop_meta.min_y())
-            #     y_max = min(output_meta.max_y(),crop_meta.max_y())
-            #
-            #     row_min1 = output_meta.row(y_min)
-            #     col_min1 = output_meta.col(x_min)
-            #
-            #     # print("Output Meta")
-            #     # print("minx,maxx,miny,maxy: ",output_meta.min_x(),output_meta.max_x(),output_meta.min_y(),output_meta.max_y())
-            #     # print("")
-            #     row_min2 = crop_meta.row(y_min)
-            #     col_min2 = crop_meta.col(x_min)
-            #     # print("row_min1: ",row_min1)
-            #     # print("row_min2: ",row_min2)
-            #     # print("")
-            #     # print("col_min1: ",col_min1)
-            #     # print("col_min2: ",col_min2)
-            #     # print("")
-            #     # print("row_max1: ",output_meta.row(y_max))
-            #     # print("row_max2: ",crop_meta.row(y_max))
-            #     # print("")
-            #     # print("col_max1: ",output_meta.col(x_max))
-            #     # print("col_max2: ",crop_meta.col(x_max))
-            #
-            #     nrows = (y_max - y_min) / output_meta.pixel_height()
-            #     ncols = (x_max - x_min) / output_meta.pixel_width()
-            #     # print("nrows: ",nrows)
-            #     # print("ncols: ",ncols)
-            #
-            #     # img2 = outimg_v[p][iimgset].as_vector()
-            #
-            #     for col_index in range(0,int(ncols-1)):
-            #         for row_index in range(0,int(nrows-1)):
-            #
-            #             newvalue = outimg_v[p][iimgset].pixel(row_index+row_min2, col_index+col_min2)
-            #             original = outputimg.pixel(row_index+row_min1, col_index+col_min1)
-            #             overlapcount = overlapcountimg.pixel(row_index+row_min1, col_index+col_min1)
-            #             outputimg.set_pixel(row_index+row_min1, col_index+col_min1, newvalue+original)
-            #             # index1 = output_meta.index(row_min1,col_min1+col_index)
-            #             # index2 = crop_meta.index(row_min2,col_min2+col_index)
-            #             # outputimg[index1+row_index] += img2[index2+row_index]
-            #             overlapcountimg.set_pixel(row_index+row_min1, col_index+col_min1, overlapcount+1.0)
-            #
-            #
-            # x_min = output_meta.min_x()
-            # x_max = output_meta.max_x()
-            # y_min = output_meta.min_y()
-            # y_max = output_meta.max_y()
-            #
-            # row_min = output_meta.row(y_min)
-            # col_min = output_meta.col(x_min)
-            #
-            # nrows = (y_max - y_min) / output_meta.pixel_height()
-            # ncols = (x_max - x_min) / output_meta.pixel_width()
-            #
-            # for col_index in range(0,int(ncols)):
-            #     for row_index in range(0,int(nrows)):
-            #         original = outputimg.pixel(row_index+row_min1, col_index+col_min1)
-            #         overlapcount = overlapcountimg.pixel(row_index+row_min1, col_index+col_min1)
-            #         if overlapcount > 0:
-            #             outputimg.set_pixel(row_index+row_min1, col_index+col_min1, original/overlapcount)
+                crop_meta=outimg_v[p][iimgset].meta()
 
+                x_min = max(output_meta.min_x(),crop_meta.min_x())
+                x_max = min(output_meta.max_x(),crop_meta.max_x())
+                y_min = max(output_meta.min_y(),crop_meta.min_y())
+                y_max = min(output_meta.max_y(),crop_meta.max_y())
+
+                row_min1 = output_meta.row(y_min)
+                col_min1 = output_meta.col(x_min)
+
+                row_min2 = crop_meta.row(y_min)
+                col_min2 = crop_meta.col(x_min)
+
+                nrows = (y_max - y_min) / output_meta.pixel_height()
+                ncols = (x_max - x_min) / output_meta.pixel_width()
+
+                # pixel loop
+                for col_index in range(0,int(ncols-1)):
+                    for row_index in range(0,int(nrows-1)):
+                        newvalue = outimg_v[p][iimgset].pixel(row_index+row_min2, col_index+col_min2)
+                        original = outputimg.pixel(row_index+row_min1, col_index+col_min1)
+                        overlapcount = overlapcountimg.pixel(row_index+row_min1, col_index+col_min1)
+                        outputimg.set_pixel(row_index+row_min1, col_index+col_min1, newvalue+original)
+                        overlapcountimg.set_pixel(row_index+row_min1, col_index+col_min1, overlapcount+1.0)
+
+            x_min = output_meta.min_x()
+            x_max = output_meta.max_x()
+            y_min = output_meta.min_y()
+            y_max = output_meta.max_y()
+
+            row_min = output_meta.row(y_min)
+            col_min = output_meta.col(x_min)
+
+            nrows = (y_max - y_min) / output_meta.pixel_height()
+            ncols = (x_max - x_min) / output_meta.pixel_width()
+
+            # second loop to set overlay with true image
+            # ...and take average value for overlaping pixels
+
+            for col_index in range(0,int(ncols-1)):
+                for row_index in range(0,int(nrows-1)):
+                    original = outputimg.pixel(row_index+row_min, col_index+col_min)
+                    overlapcount = overlapcountimg.pixel(row_index+row_min, col_index+col_min)
+                    truevalue= wholeview_v.at(p).pixel(row_index+row_min, col_index+col_min)
+                    if overlapcount > 0:
+                        outputimg.set_pixel(row_index+row_min, col_index+col_min, original/overlapcount)
+                    if p!=2:
+                        if col_index<2400:
+                            if ev_chstatus.Status(p).as_vector()[col_index]<4:
+                                labelsimg.set_pixel(row_index+row_min, col_index+col_min,1.0)
+                            else:
+                                outputimg.set_pixel(row_index+row_min, col_index+col_min,truevalue)
+                    else:
+                        if ev_chstatus.Status(p).as_vector()[col_index]<4:
+                            labelsimg.set_pixel(row_index+row_min, col_index+col_min,1.0)
+                        else:
+                            outputimg.set_pixel(row_index+row_min, col_index+col_min,truevalue)
 
             ev_infill.Append(outputimg)
             ev_input.Append(wholeview_v.at(p))
+            ev_labels.Append(labelsimg)
 
 
     def process_entries(self,start=0, end=-1):
@@ -368,4 +370,3 @@ class UBInfillClient(Client):
     def finalize(self):
         self._inlarcv.finalize()
         self._outlarcv.finalize()
-        # self._inlarlite.close()
