@@ -19,8 +19,7 @@ class UBInfillClient(Client):
                     larcv_supera_file,
                     output_larcv_filename,
                     adc_producer="wire", chstatus_producer="wire",
-                    tick_backwards=True, infill_tree_name="infill",
-                    labels_tree_name="labels",**kwargs):
+                    tick_backwards=True, infill_tree_name="infill",**kwargs):
         """
         """
         super(UBInfillClient,self).__init__(broker_address,**kwargs)
@@ -43,7 +42,6 @@ class UBInfillClient(Client):
         self._infill_tree_name  = infill_tree_name
         self._adc_producer      = adc_producer
         self._chstatus_producer = chstatus_producer
-        self._labels_tree_name  = labels_tree_name
 
         self._ubsplitdet = None
 
@@ -149,7 +147,7 @@ class UBInfillClient(Client):
         # (send crops to worker to go through network)
         replies = self.send_image_list(img2d_list,run=run,subrun=subrun,event=event)
         print ("FINISHED SEND STEP")
-        self.process_received_images(wholeview_v,labels_v,ev_chstatus,replies)
+        self.process_received_images(wholeview_v,ev_chstatus,replies)
         print ("FINISHED PROCESS STEP")
 
         self._outlarcv.set_id( self._inlarcv.event_id().run(),
@@ -262,7 +260,7 @@ class UBInfillClient(Client):
                         %(received_compressed/1.0e6, received_uncompressed/1.0e6))
         return imgout_v
 
-    def process_received_images(self, wholeview_v,labels_v,ev_chstatus, outimg_v):
+    def process_received_images(self, wholeview_v,ev_chstatus, outimg_v):
         """ receive the list of images from the worker """
         # this is where we stitch the crops together
         nplanes = wholeview_v.size()
@@ -273,19 +271,12 @@ class UBInfillClient(Client):
         ev_input = self._outlarcv.\
                         get_data(larcv.kProductImage2D,
                                 self._adc_producer)
-        ev_labels = self._outlarcv.\
-                        get_data(larcv.kProductImage2D,
-                                self._labels_tree_name)
 
         for p in xrange(nplanes):
 
             # create final output image
             outputimg = larcv.Image2D( wholeview_v.at(p).meta() )
             outputimg.paint(0)
-
-            # labels image to mark dead channels for overlay
-            labelsimg = larcv.Image2D( labels_v.at(p).meta() )
-            labelsimg.paint(0.0)
 
             # temp image to use for averaging later
             overlapcountimg = larcv.Image2D( wholeview_v.at(p).meta() )
@@ -345,20 +336,16 @@ class UBInfillClient(Client):
                         outputimg.set_pixel(row_index+row_min, col_index+col_min, original/overlapcount)
                     if p!=2:
                         if col_index<2400:
-                            if ev_chstatus.Status(p).as_vector()[col_index]<4:
-                                labelsimg.set_pixel(row_index+row_min, col_index+col_min,1.0)
-                            else:
+                            if ev_chstatus.Status(p).as_vector()[col_index]==4:
                                 outputimg.set_pixel(row_index+row_min, col_index+col_min,truevalue)
+
                     else:
-                        if ev_chstatus.Status(p).as_vector()[col_index]<4:
-                            labelsimg.set_pixel(row_index+row_min, col_index+col_min,1.0)
-                        else:
+                        if ev_chstatus.Status(p).as_vector()[col_index]==4:
                             outputimg.set_pixel(row_index+row_min, col_index+col_min,truevalue)
+
 
             ev_infill.Append(outputimg)
             ev_input.Append(wholeview_v.at(p))
-            ev_labels.Append(labelsimg)
-
 
     def process_entries(self,start=0, end=-1):
         if end<0:
