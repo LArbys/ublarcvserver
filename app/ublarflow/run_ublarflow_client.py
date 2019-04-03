@@ -26,7 +26,7 @@ if __name__ == "__main__":
                                    supera_larcv_filename,
                                    output_larcv_filename,
                                    adc_producer="wiremc",
-                                   save_as_sparseimg=True,
+                                   save_as_sparseimg=False,
                                    tick_backwards=True)
 
     client.connect()
