@@ -11,15 +11,9 @@ if __name__ == "__main__":
     bindpoint = "tcp://*:6005"
 
     weights_dir = "/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill/"
-    # weights_files = {0:weights_dir+"/uplane_MC_40000.tar",
-    #                  1:weights_dir+"/vplane_MC_21500.tar",
-    #                  2:weights_dir+"/yplane_MC_33000.tar"}
-
-    weights_files = {0:weights_dir+"/yplane_MC_33000.tar",
-                  1:weights_dir+"/vplane_MC_21500.tar",
-                  2:weights_dir+"/uplane_MC_40000.tar"}
-
-
+    weights_files = {0:weights_dir+"/uplane_MC_40000.tar",
+                     1:weights_dir+"/vplane_MC_21500.tar",
+                     2:weights_dir+"/yplane_MC_33000.tar"}
 
 
     # change to my directory, get rid of opreco? - means changing Client constructer
