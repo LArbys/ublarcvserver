@@ -285,64 +285,14 @@ class UBInfillClient(Client):
             nimgsets = len(outimg_v[p])
             output_meta=outputimg.meta()
 
-            # loop through all crops to stitch onto overlay image
+            # loop through all crops to stitch onto outputimage
             for iimgset in xrange(nimgsets):
-
-                crop_meta=outimg_v[p][iimgset].meta()
-
-                x_min = max(output_meta.min_x(),crop_meta.min_x())
-                x_max = min(output_meta.max_x(),crop_meta.max_x())
-                y_min = max(output_meta.min_y(),crop_meta.min_y())
-                y_max = min(output_meta.max_y(),crop_meta.max_y())
-
-                row_min1 = output_meta.row(y_min)
-                col_min1 = output_meta.col(x_min)
-
-                row_min2 = crop_meta.row(y_min)
-                col_min2 = crop_meta.col(x_min)
-
-                nrows = (y_max - y_min) / output_meta.pixel_height()
-                ncols = (x_max - x_min) / output_meta.pixel_width()
-
-                # pixel loop
-                for col_index in range(0,int(ncols-1)):
-                    for row_index in range(0,int(nrows-1)):
-                        newvalue = outimg_v[p][iimgset].pixel(row_index+row_min2, col_index+col_min2)
-                        original = outputimg.pixel(row_index+row_min1, col_index+col_min1)
-                        overlapcount = overlapcountimg.pixel(row_index+row_min1, col_index+col_min1)
-                        outputimg.set_pixel(row_index+row_min1, col_index+col_min1, newvalue+original)
-                        overlapcountimg.set_pixel(row_index+row_min1, col_index+col_min1, overlapcount+1.0)
-
-            x_min = output_meta.min_x()
-            x_max = output_meta.max_x()
-            y_min = output_meta.min_y()
-            y_max = output_meta.max_y()
-
-            row_min = output_meta.row(y_min)
-            col_min = output_meta.col(x_min)
-
-            nrows = (y_max - y_min) / output_meta.pixel_height()
-            ncols = (x_max - x_min) / output_meta.pixel_width()
-
-            # second loop to set overlay with true image
-            # ...and take average value for overlaping pixels
-
-            for col_index in range(0,int(ncols-1)):
-                for row_index in range(0,int(nrows-1)):
-                    original = outputimg.pixel(row_index+row_min, col_index+col_min)
-                    overlapcount = overlapcountimg.pixel(row_index+row_min, col_index+col_min)
-                    truevalue= wholeview_v.at(p).pixel(row_index+row_min, col_index+col_min)
-                    if overlapcount > 0:
-                        outputimg.set_pixel(row_index+row_min, col_index+col_min, original/overlapcount)
-                    if p!=2:
-                        if col_index<2400:
-                            if ev_chstatus.Status(p).as_vector()[col_index]==4:
-                                outputimg.set_pixel(row_index+row_min, col_index+col_min,truevalue)
-
-                    else:
-                        if ev_chstatus.Status(p).as_vector()[col_index]==4:
-                            outputimg.set_pixel(row_index+row_min, col_index+col_min,truevalue)
-
+                ublarcvapp.InfillImageStitcher().Croploop(output_meta,
+                                            outimg_v[p][iimgset], outputimg,
+                                            overlapcountimg)
+            # creates overlay image and takes average where crops overlapped
+            ublarcvapp.InfillImageStitcher().Overlayloop(p,output_meta,outputimg,
+                                            overlapcountimg, wholeview_v, ev_chstatus)
 
             ev_infill.Append(outputimg)
             ev_input.Append(wholeview_v.at(p))
