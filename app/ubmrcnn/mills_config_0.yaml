@@ -15,7 +15,7 @@ SOLVER:
   #was .01
   GAMMA: 0.1
   # 1x schedule (note TRAIN.IMS_PER_BATCH: 1)
-  MAX_ITER: 80000 #274500
+  MAX_ITER: 120000 #274500
   STEPS: [0]
 RPN:
   SIZES: (32, 64, 128, 256, 512)

@@ -21,13 +21,13 @@ if __name__ == "__main__":
     # larlite_opreco_file = input_dir+"/opreco-Run000001-SubRun006867.root"
     output_larcv_filename = "out_mrcnn_test.root"
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     pbroker = start_broker(bindpoint)
 
     pworkers = startup_ubmrcnn_workers(endpoint,weights_files,
                                         # devices="cuda",nplanes=[0,1,2],
-                                        devices="cuda",nplanes=[0],
+                                        devices=["cuda:0","cuda:1","cuda:2"],nplanes=[0,1,2],
                                         batch_size=1)
 
     client = UBMRCNNClient(endpoint,larcv_supera_file,
@@ -42,4 +42,7 @@ if __name__ == "__main__":
     client.finalize()
 
     print("[ENTER] to quit.")
-    raw_input()
+    if sys.version_info[0] < 3:
+        raw_input()
+    else:
+        input()

@@ -126,7 +126,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
     def load_model(self,weight_file,device,use_half):
         # import pytorch
         self._log.info("load_model does not use device, or use_half in MRCNN")
-        print(device)
+        print("Device in load model: ", device)
 
         try:
             import torch
@@ -148,21 +148,39 @@ class UBMRCNNWorker(MDPyWorkerBase):
         self._log = logging.getLogger(self.idname())
 
         self.device = torch.device(device)
+        print("torch.device(device): ", self.device)
 
         # if not self._use_half:
         #     self.model = ubMRCNN(weight_file).to(self.device)
         # else:
         #     self.model = ubMRCNN(weight_file).half().to(self.device)
         # self.model.eval()
-
-        self.model = Generalized_RCNN()
-        self.model.cuda()
+        import time
+        # print("Right Before Generalized_RCNN")
+        # time.sleep(00)
+        # print("Go!")
+        self.model = Generalized_RCNN().to(self.device)
+        print("Right Before Torch.load")
+        # time.sleep(5)
+        print("Go!")
+        self.model.cuda(self.device)
+        print("Right Before Torch.load")
+        # time.sleep(5)
+        print("Go!")
         checkpoint = torch.load(weight_file, map_location=lambda storage, loc: storage)
+        print("type(checkpoint['model'])",type(checkpoint['model']))
+        # print("Right Before load_ckpt")
+        # time.sleep(10)
+        # print("Go!")
         net_utils.load_ckpt(self.model, checkpoint['model'])
+        # print("Right Before dataparallel")
+        # time.sleep(00)
+        # print("Go!")
         self.model = mynn.DataParallel(self.model, cpu_keywords=['im_info', 'roidb'],
                                      minibatch=True, device_ids=[0])  # only support single GPU
         self.model.eval()
-
+        # print("Sleep again")
+        # time.sleep(00)
 
     def make_reply(self,request,nreplies):
         """we load each image and pass it through the net.
@@ -301,7 +319,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
 
 
 
-                        clustermasks_this_img.append(larcv.as_clustermask(segm_np, round_box, meta))
+                        clustermasks_this_img.append(larcv.as_clustermask(segm_np, round_box, meta, np.array([cls_boxes[cls][roi][4]], dtype=np.float32)))
                         mask_count = mask_count + 1
                         ### Checks to make sure the clustermasks being placed
                         ### in the list have the appropriate values relative
@@ -356,6 +374,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
             for mask_idx in xrange(len(clustermask_set)):
                 print("         second loop, go through all the masks in the image")
                 mask = clustermask_set[mask_idx]
+                # print(mask.as_vector_box_no_convert()[0], mask.as_vector_box_no_convert()[1], mask.as_vector_box_no_convert()[2], mask.as_vector_box_no_convert()[3])
                 meta  = mask.meta
                 # print((meta.dump()))
                 # print(type(mask))

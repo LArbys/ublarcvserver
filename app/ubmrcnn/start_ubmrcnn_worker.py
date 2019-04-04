@@ -35,7 +35,7 @@ def startup_ubmrcnn_workers( broker_address, weights_files,
 
     # setup the worker
     pworkers = []
-    print("plans: ",nplanes)
+    print("planes: ",nplanes)
     print("devices: ",devices)
     for p,device in zip(nplanes,devices):
         pworker = Process(target=start_ubmrcnn_worker,

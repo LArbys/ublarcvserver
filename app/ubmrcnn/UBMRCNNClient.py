@@ -43,6 +43,7 @@ class UBMRCNNClient(Client):
 
         self._outlarcv = larcv.IOManager(larcv.IOManager.kWRITE)
         self._outlarcv.set_out_file(output_larcv_filename)
+        self._outlarcv.set_verbosity(larcv.msg.kDEBUG)
         self._outlarcv.initialize()
         self._log = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ class UBMRCNNClient(Client):
                                               self._adc_producer)
         wholeview_v = ev_wholeview.Image2DArray()
         nplanes = wholeview_v.size()
+
         run    = self._inlarcv.event_id().run()
         subrun = self._inlarcv.event_id().subrun()
         event  = self._inlarcv.event_id().event()
@@ -136,6 +138,10 @@ class UBMRCNNClient(Client):
 
         # send messages
         replies = self.send_image_list(img2d_v,run=run,subrun=subrun,event=event)
+        print()
+        print("len(replies)", len(replies))
+        print("len(replies[0])", len(replies[0]))
+        print()
         self.process_received_images(wholeview_v,replies)
 
         self._outlarcv.set_id( self._inlarcv.event_id().run(),
@@ -153,16 +159,19 @@ class UBMRCNNClient(Client):
         rse = (run,subrun,event)
         self._log.info("sending images with rse={}".format(rse))
 
-        imgout_v = {}
+        masks_v = {}
         nsize_uncompressed = 0
         nsize_compressed = 0
         received_compressed = 0
         received_uncompressed = 0
         imageid_received = {}
         nimages_sent = 0
+        print("PLANES:", planes)
         for p in planes:
-            if p not in imgout_v:
-                imgout_v[p] = []
+            print()
+            print("plane: ", p)
+            if p not in masks_v:
+                masks_v[p] = []
 
             #if p not in [2]:
             #    continue
@@ -214,6 +223,7 @@ class UBMRCNNClient(Client):
                                 c_run, c_subrun, c_event, c_id )
 
 
+
                         #byref(c_run),byref(c_subrun),byref(c_event),byref(c_id))
                     rep_rse = (c_run.value,c_subrun.value,
                                 c_event.value)
@@ -230,9 +240,9 @@ class UBMRCNNClient(Client):
                     self._log.debug("received image with correct rseid={}"
                                         .format(rep_rse))
 
-                    imgout_v[p].append(replymask)
+                    masks_v[p].append(replymask)
                 self._log.debug("running total, converted plane[{}] images: {}"
-                                .format(p,len(imgout_v[p])))
+                                .format(p,len(masks_v[p])))
             complete = True
             # should be a multiple of 2: (shower,track)
             # if len(imgout_v[p])>0 and len(imgout_v[p])%2!=0:
@@ -252,42 +262,41 @@ class UBMRCNNClient(Client):
                         %(nsize_uncompressed/1.0e6,nsize_compressed/1.0e6))
         self._log.debug("Total received. compressed=%.2f uncompressed=%.2f MB"\
                         %(received_compressed/1.0e6, received_uncompressed/1.0e6))
-        return imgout_v
+        return masks_v
 
-    def process_received_images(self, wholeview_v, outimg_v):
+    def process_received_images(self, wholeview_v, out_masks_vv):
         """ receive the list of images from the worker """
         nplanes = wholeview_v.size()
+        # nplanes = 1
+        # print("FORCING NPLANES=1")
+        print(larcv.kProductClusterMask, type(larcv.kProductClusterMask))
+        print(self._mrcnn_tree_name+"_masks", "{{type:", type(self._mrcnn_tree_name+"_masks"))
+        ev_clustermasks = self._outlarcv.\
+                        get_data(larcv.kProductClusterMask,
+                                 self._mrcnn_tree_name+"_masks")
+        print(len(ev_clustermasks.as_vector()))
+        if len(ev_clustermasks.as_vector()) > 0:
+            print(len(ev_clustermasks.as_vector()[0]))
 
-        ev_shower = self._outlarcv.\
-                        get_data(larcv.kProductImage2D,
-                                 self._mrcnn_tree_name+"_shower")
-        ev_track  = self._outlarcv.\
-                        get_data(larcv.kProductImage2D,
-                                 self._mrcnn_tree_name+"_track")
+        masks_vv = ev_clustermasks.as_vector()
+        masks_vv.resize(nplanes)
+        print("Survival?")
+        # ev_track  = self._outlarcv.\
+        #                 get_data(larcv.kProductImage2D,
+        #                          self._mrcnn_tree_name+"_track")
         #ev_bg     = self._outlarcv.\
         #                get_data(larcv.kProductImage2D,"mrcnn_background")
 
         for p in range(nplanes):
+            nmasks = int(len(out_masks_vv[p]))
+            for mask in range(nmasks):
+                print("Are we seeing probs?", out_masks_vv[p][mask].probability_of_class)
+                masks_vv.at(p).push_back(out_masks_vv[p][mask])
+        print(len(ev_clustermasks.as_vector()))
+        if len(ev_clustermasks.as_vector()) > 0:
+            print(len(ev_clustermasks.as_vector()[0]))
 
-            showerimg = larcv.Image2D( wholeview_v.at(p).meta() )
-            #bgimg     = larcv.Image2D( wholeview_v.at(p).meta() )
-            trackimg  = larcv.Image2D( wholeview_v.at(p).meta() )
-            showerimg.paint(0)
-            #bgimg.paint(0)
-            trackimg.paint(0)
 
-            nimgsets = len(outimg_v[p])/2
-            for iimgset in range(nimgsets):
-                #bg  = outimg_v[p][iimgset*3+0]
-                shr = outimg_v[p][iimgset*2+0]
-                trk = outimg_v[p][iimgset*2+1]
-
-                showerimg.overlay(shr,larcv.Image2D.kOverWrite)
-                trackimg.overlay( trk,larcv.Image2D.kOverWrite)
-                #bgimg.overlay(    bg, larcv.Image2D.kOverWrite)
-            ev_shower.Append(showerimg)
-            ev_track.Append(trackimg)
-            #ev_bg.Append(bgimg)
 
     def process_entries(self,start=0, end=-1):
         if end<0:
@@ -299,4 +308,5 @@ class UBMRCNNClient(Client):
     def finalize(self):
         self._inlarcv.finalize()
         self._outlarcv.finalize()
-        self._inlarlite.close()
+        if self._inlarlite != None:
+            self._inlarlite.close()
