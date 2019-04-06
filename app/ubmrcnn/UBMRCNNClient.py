@@ -206,10 +206,8 @@ class UBMRCNNClient(Client):
                 self._log.debug("num frames received from worker: {}"
                                 .format(len(workerout)))
                 # use the time worker is preparing next part, to convert image
-                count =0
+                print("Number of replies:", len(workerout))
                 for reply in workerout:
-                    print(count)
-                    count=count+1
                     data = bytes(reply)
                     received_compressed += len(data)
                     data = zlib.decompress(data)
@@ -218,7 +216,6 @@ class UBMRCNNClient(Client):
                     c_subrun = c_int()
                     c_event = c_int()
                     c_id = c_int()
-                    print("I expect this much at least")
                     replymask = larcv.json.clustermask_from_pybytes(data,
                                 c_run, c_subrun, c_event, c_id )
 
