@@ -1,3 +1,6 @@
 [submodule "networks/pytorch-uresnet"]
 	path = networks/pytorch-uresnet
 	url = https://github.com/nutufts/pytorch-uresnet
+[submodule "networks/Detectron.pytorch"]
+	path = networks/Detectron.pytorch
+	url = https://github.com/NuTufts/Detectron.pytorch.git
