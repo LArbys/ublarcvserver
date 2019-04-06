@@ -2,5 +2,5 @@
 	path = networks/pytorch-uresnet
 	url = https://github.com/nutufts/pytorch-uresnet
 [submodule "networks/Detectron.pytorch"]
-	path = networks/Detectron.pytorch
+	path = networks/mask-rcnn.pytorch
 	url = https://github.com/NuTufts/Detectron.pytorch.git
