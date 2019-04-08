@@ -207,7 +207,7 @@ class UBInfillClient(Client):
                 if isfinal:
                     self._log.info("received done indicator by worker")
                     break
-                self._log.debug("num frames received from worker: {}"
+                print ("num frames received from worker: {}"
                                 .format(len(workerout)))
                 # use the time worker is preparing next part, to convert image
                 for reply in workerout:

@@ -59,7 +59,7 @@ if __name__ == "__main__":
     # endpoint:
     endpoint  = "tcp://localhost:6005"
     bindpoint = "tcp://*:6005"
-    weights_dir = "/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill/"
+    weights_dir = "../../../networks/infill/"
     weights_files = {0:weights_dir+"/uplane_MC_40000.tar",
                       1:weights_dir+"/vplane_MC_21500.tar",
                       2:weights_dir+"/yplane_MC_33000.tar"}
