@@ -21,6 +21,7 @@ class UBDenseLArFlowClient(Client):
                  tick_backwards=False,
                  save_cropped_adc=False,
                  flow_dirs=["y2u","y2v"],
+                 plane_scale_factors=[1.0,1.0,1.0],
                  **kwargs):
         """
         this class loads either larcv::sparseimage or larcv::image2d data from
@@ -64,6 +65,9 @@ class UBDenseLArFlowClient(Client):
 
         # thresholds: adc values must be above this value to be included
         self._threshold_v   = std.vector("float")(3,10.0)
+
+        # global scale factors to apply to ADC values for each plane
+        self._plane_scale_factors = plane_scale_factors
 
         # setup logger
         self._log = logging.getLogger(__name__)
@@ -190,6 +194,13 @@ class UBDenseLArFlowClient(Client):
             tary2u = crop_v.at( 3*iset+0 )
             tary2v = crop_v.at( 3*iset+1 )
 
+            if self._plane_scale_factors[2]!=1.0:
+                srcimg.scale_inplace( self._plane_scalefactors[2] )
+            if self._plane_scale_factors[0]!=1.0:
+                tary2u.scale_inplace( self._plane_scalefactors[0] )
+            if self._plane_scale_factors[1]!=1.0:
+                tary2v.scale_inplace( self._plane_scalefactors[1] )
+                
             # to compress further, we represent as sparseimage
             src_v = std.vector("larcv::Image2D")()
             y2u_v = std.vector("larcv::Image2D")()

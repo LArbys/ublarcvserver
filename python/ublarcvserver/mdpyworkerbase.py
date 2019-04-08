@@ -80,11 +80,12 @@ class MDPyWorkerBase(object):
             self._log.info("Connected to broker at %s",
                         self._broker_address)
         else:
+            self._log.info("Connecting to broker at {} via ssh-tunnel {}"
+                            .format(self._broker_address,self._ssh_thru_server))
             ssh.tunnel_connection(self._socket, self._broker_address,
                                     self._ssh_thru_server,
                                     password=self._ssh_password )
-            self._log.info("Connected to broker at {} via ssh-tunnel {}"
-                            .format(self._broker_address,self._ssh_thru_server))
+            self._log.info("Connected to broker.")
 
         self._poller = zmq.Poller()
         self._poller.register(self._socket, zmq.POLLIN)
