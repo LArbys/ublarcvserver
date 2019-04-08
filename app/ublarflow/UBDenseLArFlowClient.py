@@ -309,16 +309,21 @@ class UBDenseLArFlowClient(Client):
             evimg_output = self._outlarcv.\
                             get_data(larcv.kProductImage2D,
                                      self._output_producer+"_"+flowdir)
-            evadc_output = self._outlarcv.\
-                get_data(larcv.kProductImage2D,"adc")
+
+            # we only store adc images once, during the first flow
+            if flowdir=="y2u":
+                evadc_output = self._outlarcv.\
+                               get_data(larcv.kProductImage2D,"adc")
             flowimgs = flowdict[flowdir]
             keys = flowimgs.keys()
             keys.sort()
             for iimg in keys:
                 flowimg = flowimgs[iimg].front()
                 evimg_output.Append(flowimg)
-                for i in xrange(3):
-                    evadc_output.Append( crop_v.at(3*iimg+i) )
+                if flowdir=="y2u":
+                    # store adc images once during the first flow
+                    for i in xrange(3):
+                        evadc_output.Append( crop_v.at(3*iimg+i) )
                 
         return True
 
