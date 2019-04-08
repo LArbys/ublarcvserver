@@ -129,17 +129,17 @@ class UBInfillClient(Client):
             p = i.meta().plane()
             if p == 0:
                 if tick_backwards:
-                    scalefactor = (43/53)
+                    scalefactor = 43.0/53.0
                     ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
                 img2du.append(i)
             elif p == 1:
                 if tick_backwards:
-                    scalefactor = (43/52)
+                    scalefactor = (43.0/52.0)
                     ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
                 img2dv.append(i)
             elif p == 2:
                 if tick_backwards:
-                    scalefactor = (48/59)
+                    scalefactor = (48.0/59.0)
                     ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
                 img2dy.append(i)
 
@@ -297,13 +297,13 @@ class UBInfillClient(Client):
             if tick_backwards:
                 for i in outimg_v[p]:
                     if p == 0:
-                        scalefactor = (53/43)
+                        scalefactor = (53.0/43.0)
                         ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
                     elif p == 1:
-                        scalefactor = (52/43)
+                        scalefactor = (52.0/43.0)
                         ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
                     elif p == 2:
-                        scalefactor = (59/48)
+                        scalefactor = (59.0/48.0)
                         ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
 
             # loop through all crops to stitch onto outputimage
