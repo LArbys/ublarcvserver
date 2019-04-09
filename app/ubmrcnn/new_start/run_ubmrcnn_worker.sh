@@ -1,6 +1,7 @@
 #!/bin/bash
 
-cd /usr/local/ubdl
+cd /cluster/tufts/wongjiradlab/jmills09/ubdl
+alias python='python3'
 source setenv.sh
 source configure.sh
 export LARCV_OPENCV=0
