@@ -19,7 +19,7 @@ class UBInfillClient(Client):
                     larcv_supera_file,
                     output_larcv_filename,
                     adc_producer="wire", chstatus_producer="wire",
-                    tick_backwards=True, infill_tree_name="infill",**kwargs):
+                    tick_backwards=False, infill_tree_name="infill",**kwargs):
         """
         """
         super(UBInfillClient,self).__init__(broker_address,**kwargs)
@@ -51,7 +51,7 @@ class UBInfillClient(Client):
     def __len__(self):
         return self.get_entries()
 
-    def process_entry(self,entry_num):
+    def process_entry(self,entry_num,tick_backwards):
         """ perform all actions -- send, receive, process, store -- for entry"""
 
         # get the entries
@@ -123,16 +123,24 @@ class UBInfillClient(Client):
 
         algo.process( wholeview_v,img2d_v,bbox_v )
 
-        print("crop meta: ",img2d_v[0].meta().dump())
 
         # seperate by planes
         for i in img2d_v:
             p = i.meta().plane()
             if p == 0:
+                if tick_backwards:
+                    scalefactor = 43.0/53.0
+                    ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
                 img2du.append(i)
             elif p == 1:
+                if tick_backwards:
+                    scalefactor = (43.0/52.0)
+                    ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
                 img2dv.append(i)
             elif p == 2:
+                if tick_backwards:
+                    scalefactor = (48.0/59.0)
+                    ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
                 img2dy.append(i)
 
         img2d_list.append(img2du)
@@ -147,7 +155,7 @@ class UBInfillClient(Client):
         # (send crops to worker to go through network)
         replies = self.send_image_list(img2d_list,run=run,subrun=subrun,event=event)
         print ("FINISHED SEND STEP")
-        self.process_received_images(wholeview_v,ev_chstatus,replies)
+        self.process_received_images(wholeview_v,ev_chstatus,replies,tick_backwards)
         print ("FINISHED PROCESS STEP")
 
         self._outlarcv.set_id( self._inlarcv.event_id().run(),
@@ -207,7 +215,7 @@ class UBInfillClient(Client):
                 if isfinal:
                     self._log.info("received done indicator by worker")
                     break
-                self._log.debug("num frames received from worker: {}"
+                print ("num frames received from worker: {}"
                                 .format(len(workerout)))
                 # use the time worker is preparing next part, to convert image
                 for reply in workerout:
@@ -260,7 +268,7 @@ class UBInfillClient(Client):
                         %(received_compressed/1.0e6, received_uncompressed/1.0e6))
         return imgout_v
 
-    def process_received_images(self, wholeview_v,ev_chstatus, outimg_v):
+    def process_received_images(self, wholeview_v,ev_chstatus, outimg_v, tick_backwards):
         """ receive the list of images from the worker """
         # this is where we stitch the crops together
         nplanes = wholeview_v.size()
@@ -284,6 +292,19 @@ class UBInfillClient(Client):
 
             nimgsets = len(outimg_v[p])
             output_meta=outputimg.meta()
+
+            # if tickbackwards,scale for mcc9 values
+            if tick_backwards:
+                for i in outimg_v[p]:
+                    if p == 0:
+                        scalefactor = (53.0/43.0)
+                        ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
+                    elif p == 1:
+                        scalefactor = (52.0/43.0)
+                        ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
+                    elif p == 2:
+                        scalefactor = (59.0/48.0)
+                        ublarcvapp.InfillImageStitcher().PixelScaling(i,scalefactor)
 
             # loop through all crops to stitch onto outputimage
             for iimgset in xrange(nimgsets):

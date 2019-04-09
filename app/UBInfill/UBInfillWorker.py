@@ -67,12 +67,6 @@ class UBInfillWorker(MDPyWorkerBase):
         sys.path.append("/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill")
         from ub_uresnet_infill import UResNetInfill
 
-        # try:
-        #     from ub_uresnet_infill import UResNetInfill
-        # except:
-        #     raise RuntimeError("could not load Infill model. did you remember"
-        #                     +" to setup?")
-
         if "cuda" not in device and "cpu" not in device:
             raise ValueError("invalid device name [{}]. Must str with name \
                                 \"cpu\" or \"cuda:X\" where X=device number")
@@ -82,7 +76,7 @@ class UBInfillWorker(MDPyWorkerBase):
 
         self.device = torch.device(device)
 
-        map_location = None
+        map_location = {"cuda:0":"cpu","cuda:1":"cpu"}
         self.model = UResNetInfill(inplanes=32,input_channels=1,num_classes=1,showsizes=False)
         checkpoint = torch.load( weight_file, map_location=map_location )
         from_data_parallel = False
@@ -102,8 +96,6 @@ class UBInfillWorker(MDPyWorkerBase):
         self.model.to(self.device)
         self.model.eval()
 
-        # with torch.set_grad_enabled(False):
-        #    logits, probas = self.model(testset_features)
 
         print ("Loaded Model!")
         # ----------------------------------------------------------------------
@@ -183,7 +175,7 @@ class UBInfillWorker(MDPyWorkerBase):
         self._log.debug("converted msgs into batch of {} images. frames={}"
                         .format(nimgs,frames_used))
         np_dtype = np.float32
-        img_batch_np = np.zeros( (nimgs,1,sizes[0][0],sizes[0][1]),
+        img_batch_np = np.zeros( (nimgs,1,sizes[0][1],sizes[0][0]),
                                     dtype=np_dtype )
 
         for iimg,img2d in enumerate(img2d_v):
@@ -191,13 +183,20 @@ class UBInfillWorker(MDPyWorkerBase):
             img2d_np = larcv.as_ndarray( img2d )\
                             .reshape( (1,1,meta.cols(),meta.rows()))
 
+            img2d_np=np.transpose(img2d_np,(0,1,3,2))
             img_batch_np[iimg,:] = img2d_np
+
+            # print("shape of image: ",img2d_np.shape)
 
 
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
         # out_batch_np = img2d_batch_t.detach().cpu().numpy()
-        out_batch_np = self.model(img2d_batch_t).detach().cpu().numpy()
+        # img2d_batch_t=np.transpose(img2d_batch_t,(0,1,3,2)).detach().cpu()
+        print("shape of image: ",img2d_batch_t.shape)
+        with torch.set_grad_enabled(False):
+            out_batch_np = self.model.forward(img2d_batch_t).detach().cpu().numpy()
+            out_batch_np=np.transpose(out_batch_np,(0,1,3,2))
 
 
         # compression techniques
@@ -222,15 +221,15 @@ class UBInfillWorker(MDPyWorkerBase):
             img2d = img2d_v[iimg]
             rseid = rseid_v[iimg]
             meta  = img2d.meta()
-            for ich in xrange(out_batch_np.shape[1]):
-                out_np = out_batch_np[iimg,ich,:,:]
-                # print("out_np",type(out_np))
-                # print("meta",type(meta))
-                out_img2d = larcv.as_image2d_meta( out_np, meta )
-                bson = larcv.json.as_pystring( out_img2d,
-                                    rseid[0], rseid[1], rseid[2], rseid[3] )
-                compressed = zlib.compress(bson)
-                reply.append(compressed)
+
+            out_np = out_batch_np[iimg,0,:,:]
+            # print("out_np",type(out_np))
+            # print("meta",type(meta))
+            out_img2d = larcv.as_image2d_meta( out_np, meta )
+            bson = larcv.json.as_pystring( out_img2d,
+                                rseid[0], rseid[1], rseid[2], rseid[3] )
+            compressed = zlib.compress(bson)
+            reply.append(compressed)
 
         if self._next_msg_id>=nmsgs:
             isfinal = True
