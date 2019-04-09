@@ -8,15 +8,15 @@ source setenv.sh
 source configure.sh
 cd scripts
 source setenv_ublarcvserver.sh
-
-weightdir=/media/disk1/jmills/cluster_weights
+SLURM_ARRAY_TASK_ID=2
+weightdir=/cluster/tufts/wongjiradlab/jmills09/ubdl/ublarcvserver/app/ubmrcnn
 let line=${SLURM_ARRAY_TASK_ID}+1
-devnum=`sed -n ${line}p /cluster/kappa/wongjiradlab/larbys/pubs/dlleepubs/ubdlserver/tufts_pgpu03_assignments.txt`
+devnum=`sed -n ${line}p /cluster/tufts/wongjiradlab/larbys/pubs/dlleepubs/ubdlserver/tufts_pgpu03_assignments.txt`
 device=`printf cuda:%d ${devnum}`
 logfile=`printf /tmp/worker_id%d.log ${SLURM_ARRAY_TASK_ID}`
-script=/cluster/kappa/wongjiradlab/larbys/pubs/dlleepubs/ubdlserver/start_ublarcvserver_mrcnn_worker.py
-#scrpit=start_ublarcvserver_worker.py
-cmd="python ${script} -l ${logfile} -d tcp://localhost:6000 -m ${device} -w ${weightdir}"
+script=/cluster/tufts/wongjiradlab/jmills09/ubdl/ublarcvserver/ubmrcnn/app/start_ublarcvserver_ubmrcnn_worker.py
+# scrpit=start_ublarcvserver_worker.py
 
-echo $cmd
-$cmd
+cmd="python ${script} -l ${logfile} -d tcp://localhost:6000 -m ${devnum} -w ${weightdir}"
+
+# $cmd

@@ -9,12 +9,12 @@
 #SBATCH --nodelist=pgpu03
 #SBATCH --array=0
 
-CONTAINER=/cluster/kappa/90-days-archive/wongjiradlab/larbys/larbys-containers/ubdl_singularity_031118.img
-SSS_BASEDIR=/usr/local/ubdl
-WORKDIR=/cluster/kappa/wongjiradlab/larbys/pubs/dlleepubs/ubdlserver
+CONTAINER=/cluster/tufts/wongjiradlab/larbys/larbys-containers/singularity_ubdl_python3_040619.img
+SSS_BASEDIR=/cluster/tufts/wongjiradlab/jmills09/ubdl
+WORKDIR=/cluster/tufts/wongjiradlab/jmills09/ubdl/ublarcvserver
 
 # IP ADDRESSES OF BROKER
-BROKER=10.246.81.73 # PGPU03
+BROKER=10.246.81.72 # PGPU02
 # BROKER=10.X.X.X # ALPHA001
 
 PORT=6000

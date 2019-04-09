@@ -10,8 +10,8 @@ parser.add_argument("-d","--debug",action="store_true",
                     help="set logger level to debug")
 parser.add_argument("-w","--weights-dir",type=str,default=None,
                     help="directory where weights can be found")
-parser.add_argument("-m","--mode",type=str,default="cuda",
-                    help="run with device. either 'cuda' or 'cpu'")
+parser.add_argument("-m","--mode",type=str,default="0",
+                    help="run with device # (ubmrcnn requires cuda)")
 parser.add_argument("-b","--batch-size",type=int,default=1,
                     help="batch size for each worker")
 parser.add_argument("-n","--num_workers",type=int,default=1,
@@ -27,8 +27,10 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     from ublarcvserver import Broker
-    from start_ubssnet_worker import startup_ubssnet_workers
+    from start_ubmrcnn_worker import startup_ubmrcnn_workers
 
+    #set up CUDA_VISIBLE_DEVICES
+    os.environ["CUDA_VISIBLE_DEVICES"]=args.mode
 
     level = logging.INFO
     if args.debug:
@@ -40,7 +42,7 @@ if __name__ == "__main__":
     log = logging.getLogger("start_ublarcvsever_worker_main")
     logging.basicConfig(level=logging.INFO)
 
-    weights_dir = "../ublarcvserver/networks/pytorch-uresnet/weights/"
+    weights_dir = "../ublarcvserver/networks/ubmrcnn/"
     if args.weights_dir is not None:
         weights_dir = args.weights_dir
     weights_files = {0:weights_dir+"/mcc8_mrcnn_plane0.pth",
@@ -74,7 +76,6 @@ if __name__ == "__main__":
     for w in xrange(args.num_workers):
         pworkers = startup_ubmrcnn_workers(endpoint,weights_files,
                                            nplanes=[0,1,2],
-                                           devices=args.mode,
                                            batch_size=batch_size,
                                            ssh_thru_server=ssh_url,
                                            ssh_password=ssh_password)

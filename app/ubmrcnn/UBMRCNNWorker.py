@@ -59,8 +59,12 @@ Implements worker for ubmrcnn
 
 class UBMRCNNWorker(MDPyWorkerBase):
 
+    # def __init__(self,broker_address,plane,
+    #              weight_file,device,batch_size,
+    #              use_half=False,
+    #              **kwargs):
     def __init__(self,broker_address,plane,
-                 weight_file,device,batch_size,
+                 weight_file,batch_size,
                  use_half=False,
                  **kwargs):
         """
@@ -96,11 +100,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
 
         super(UBMRCNNWorker,self).__init__( service_name,
                                             broker_address, **kwargs)
-        # SSNET Load:
-        # self.load_model(weight_file,device,self._use_half)
-        # if self.is_model_loaded():
-        #     self._log.info("Loaded ubMRCNN model. Service={}"\
-        #                     .format(service_name))
+
 
         #Get Configs going:
         self.dataset = datasets.get_particle_dataset()
@@ -112,21 +112,19 @@ class UBMRCNNWorker(MDPyWorkerBase):
         cfg.MODEL.LOAD_IMAGENET_PRETRAINED_WEIGHTS = False  # Don't need to load imagenet pretrained weights
         assert_and_infer_cfg()
 
-        #MRCNN Load:
-        # maskRCNN = Generalized_RCNN()
-        # maskRCNN.cuda()
-        # checkpoint = torch.load(weight_file, map_location=lambda storage, loc: storage)
-        # net_utils.load_ckpt(maskRCNN, checkpoint['model'])
-        self.load_model(weight_file,device,self._use_half)
+        # self.load_model(weight_file,device,self._use_half)
+        self.load_model(weight_file,self._use_half)
         if self.is_model_loaded():
             self._log.info("Loaded ubMRCNN model. Service={}"\
                             .format(service_name))
 
 
-    def load_model(self,weight_file,device,use_half):
+    # def load_model(self,weight_file,device,use_half):
+    def load_model(self,weight_file,use_half):
+
         # import pytorch
-        self._log.info("load_model does not use device, or use_half in MRCNN")
-        print("Device in load model: ", device)
+        # self._log.info("load_model does not use device, or use_half in MRCNN")
+        # print("Device in load model: ", device)
 
         try:
             import torch
@@ -141,13 +139,13 @@ class UBMRCNNWorker(MDPyWorkerBase):
             raise RuntimeError("could not load ubMRCNN model. did you remember"
                             +" to setup everything?")
 
-        if "cuda" not in device and "cpu" not in device:
-            raise ValueError("invalid device name [{}]. Must str with name \
-                                \"cpu\" or \"cuda:X\" where X=device number")
+        # if "cuda" not in device and "cpu" not in device:
+        #     raise ValueError("invalid device name [{}]. Must str with name \
+        #                         \"cpu\" or \"cuda:X\" where X=device number")
 
         self._log = logging.getLogger(self.idname())
 
-        self.device = torch.device(device)
+        # self.device = torch.device(device)
 
         self.model = Generalized_RCNN()
 
@@ -155,7 +153,6 @@ class UBMRCNNWorker(MDPyWorkerBase):
 
         net_utils.load_ckpt(self.model, checkpoint['model'])
 
-        device_ids = list(range(torch.cuda.device_count()))
         self.model = mynn.DataParallel(self.model, cpu_keywords=['im_info', 'roidb'],
                                      minibatch=True, device_ids=[0], output_device=0)  # only support single GPU
         self.model.eval()

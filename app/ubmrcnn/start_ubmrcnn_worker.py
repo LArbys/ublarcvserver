@@ -8,11 +8,11 @@ Start the broker and worker. Run one client. Useful for tests.
 """
 
 def start_ubmrcnn_worker(broker_address,plane,weight_file,
-                         device,batch_size,
+                         batch_size,
                          ssh_thru_server,ssh_password):
     print(batch_size,type(batch_size))
     worker=UBMRCNNWorker(broker_address,plane,weight_file,
-                         device,batch_size,
+                         batch_size,
                          ssh_thru_server=ssh_thru_server,
                          ssh_password=ssh_password)
     worker.connect()
@@ -21,26 +21,19 @@ def start_ubmrcnn_worker(broker_address,plane,weight_file,
 
 
 def startup_ubmrcnn_workers( broker_address, weights_files,
-                             devices=["cuda","cuda","cuda"],
                              batch_size=1,
                              nplanes=[0,1,2],
                              ssh_thru_server=None, ssh_password=None,
                              start=True):
-    if type(devices) is str:
-        devices = len(nplanes)*[devices]
-    if len(devices)>len(nplanes):
-        devices = [devices[x] for x in xrange(len(nplanes))]
-    elif len(devices)<len(nplanes):
-        raise ValueError("devices need to be speficied for each plane")
+
 
     # setup the worker
     pworkers = []
     print("planes: ",nplanes)
-    print("devices: ",devices)
-    for p,device in zip(nplanes,devices):
+    for p in nplanes:
         pworker = Process(target=start_ubmrcnn_worker,
                           args=(broker_address,p,weights_files[p],
-                                device,batch_size,
+                                batch_size,
                                 ssh_thru_server,ssh_password))
         pworker.daemon = True
         pworkers.append(pworker)
