@@ -38,8 +38,8 @@ if __name__ == "__main__":
                             skip_detsplit=True)
     client.connect()
 
-    # client.process_entry(1)
-    client.process_entries(10)
+    client.process_entry(1)
+    # client.process_entries()
     client.finalize()
 
     print("[ENTER] to quit.")

@@ -8,39 +8,33 @@ Start the broker and worker. Run one client. Useful for tests.
 """
 
 def start_ubmrcnn_worker(broker_address,plane,weight_file,
-                         device,batch_size,
+                         batch_size,
                          ssh_thru_server,ssh_password):
     print(batch_size,type(batch_size))
     worker=UBMRCNNWorker(broker_address,plane,weight_file,
-                         device,batch_size,
+                         batch_size,
                          ssh_thru_server=ssh_thru_server,
-                         ssh_password=ssh_password)
+                         ssh_password=ssh_password,
+                        )
     worker.connect()
     print("worker started: ",worker.idname())
     worker.run()
 
 
 def startup_ubmrcnn_workers( broker_address, weights_files,
-                             devices=["cuda","cuda","cuda"],
                              batch_size=1,
                              nplanes=[0,1,2],
                              ssh_thru_server=None, ssh_password=None,
                              start=True):
-    if type(devices) is str:
-        devices = len(nplanes)*[devices]
-    if len(devices)>len(nplanes):
-        devices = [devices[x] for x in xrange(len(nplanes))]
-    elif len(devices)<len(nplanes):
-        raise ValueError("devices need to be speficied for each plane")
+
 
     # setup the worker
     pworkers = []
     print("planes: ",nplanes)
-    print("devices: ",devices)
-    for p,device in zip(nplanes,devices):
+    for p in nplanes:
         pworker = Process(target=start_ubmrcnn_worker,
                           args=(broker_address,p,weights_files[p],
-                                device,batch_size,
+                                batch_size,
                                 ssh_thru_server,ssh_password))
         pworker.daemon = True
         pworkers.append(pworker)
@@ -59,15 +53,19 @@ if __name__ == "__main__":
     # endpoint:
     endpoint  = "tcp://localhost:6005"
     bindpoint = "tcp://*:6005"
-    weights_dir = "/home/twongjirad/working/nutufts/pytorch-uresnet/weights/"
-    weights_files = {0:weights_dir+"/mcc8_caffe_ubmrcnn_plane0.tar",
-                     1:weights_dir+"/mcc8_caffe_ubmrcnn_plane1.tar",
-                     2:weights_dir+"/mcc8_caffe_ubmrcnn_plane2.tar"}
+    weights_dir = "/home/jmills/workdir/ubdl/ublarcvserver/app/ubmrcnn"
+    weights_files = {0:weights_dir+"/mcc8_mrcnn_plane0.pth",
+                     1:weights_dir+"/mcc8_mrcnn_plane1.pth",
+                     2:weights_dir+"/mcc8_mrcnn_plane2.pth"}
 
     logging.basicConfig(level=logging.DEBUG)
 
     pbroker = start_broker(bindpoint)
     pworkers = startup_ubmrcnn_workers(endpoint,weights_files,nplanes=[0,1,2])
 
+
     print("[ENTER] to quit.")
-    raw_input()
+    if sys.version_info[0] < 3:
+        raw_input()
+    else:
+        input()
