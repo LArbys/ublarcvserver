@@ -43,7 +43,7 @@ if __name__ == "__main__":
                                 adc_producer=args.adc, tick_backwards=args.tick, mrcnn_tree_name=args.out_tree_name)
     client.connect()
 
-    client.process_entry(0)
+    client.process_entries()
 
     print("processed")
 
