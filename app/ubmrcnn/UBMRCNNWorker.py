@@ -26,7 +26,10 @@ import matplotlib
 matplotlib.use('Agg')
 
 import numpy as np
-import cv2
+try:
+    import cv2
+except:
+    print("No OpenCV")
 
 import torch
 import torch.nn as nn
@@ -50,8 +53,6 @@ import ROOT
 from larcv import larcv
 import numpy as np
 from torch.utils.data import Dataset
-#new imports:
-import cv2
 
 """
 Implements worker for ubmrcnn
@@ -65,6 +66,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
     #              **kwargs):
     def __init__(self,broker_address,plane,
                  weight_file,batch_size,
+                 device_id=None,
                  use_half=False,
                  **kwargs):
         """
@@ -95,12 +97,9 @@ class UBMRCNNWorker(MDPyWorkerBase):
         if self._use_half:
             print("Using half of mrcnn not tested")
             assert 1==2
-
-        service_name = "ubmrcnn_plane%d"%(self.plane)
-
+        service_name = "ubmrcnn_plane%d"%(self.plane)        
         super(UBMRCNNWorker,self).__init__( service_name,
-                                            broker_address, **kwargs)
-
+                                            broker_address, **kwargs)                    
 
         #Get Configs going:
         self.dataset = datasets.get_particle_dataset()
@@ -113,14 +112,15 @@ class UBMRCNNWorker(MDPyWorkerBase):
         assert_and_infer_cfg()
 
         # self.load_model(weight_file,device,self._use_half)
-        self.load_model(weight_file,self._use_half)
+        self.load_model(weight_file,self._use_half,device_id)
         if self.is_model_loaded():
             self._log.info("Loaded ubMRCNN model. Service={}"\
                             .format(service_name))
 
 
+
     # def load_model(self,weight_file,device,use_half):
-    def load_model(self,weight_file,use_half):
+    def load_model(self,weight_file,use_half,device_id):
 
         # import pytorch
         # self._log.info("load_model does not use device, or use_half in MRCNN")
@@ -149,13 +149,26 @@ class UBMRCNNWorker(MDPyWorkerBase):
 
         self.model = Generalized_RCNN()
 
-        checkpoint = torch.load(weight_file, map_location=lambda storage, loc: storage)
+        #checkpoint = torch.load(weight_file, map_location=lambda storage, loc: storage)
+        locations = {}
+        for x in range(6):
+            locations["cuda:%d"%(x)] = "cpu"
+        checkpoint = torch.load(weight_file, map_location=locations)
+
+        self.device_id = device_id        
+        if device_id==None:
+            self.device = torch.device("cpu")
+        else:
+            self.device = torch.device("cuda:%d"%(device_id))
+
 
         net_utils.load_ckpt(self.model, checkpoint['model'])
-
         self.model = mynn.DataParallel(self.model, cpu_keywords=['im_info', 'roidb'],
-                                     minibatch=True, device_ids=[0], output_device=0)  # only support single GPU
+                                       minibatch=True, device_ids=[0],
+                                       output_device=0)  # only support single GPU
         self.model.eval()
+        #for x,t in self.model.state_dict().items():
+        #    print(x,t.device)        
 
 
     def make_reply(self,request,nreplies):

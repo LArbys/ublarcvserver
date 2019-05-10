@@ -1,6 +1,8 @@
 #!/bin/bash
 basedir=$PWD
-cd /home/jmills/workdir/ubdl
+#cd /home/twongj01/working/larbys/py3_ubdl
+cd $UBDL_BASEDIR
+
 # alias python='python3'
 source setenv.sh
 source configure.sh

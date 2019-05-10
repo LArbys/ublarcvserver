@@ -8,11 +8,13 @@ Start the broker and worker. Run one client. Useful for tests.
 """
 
 def start_ubmrcnn_worker(broker_address,plane,weight_file,
+                         device_id,
                          batch_size,
                          ssh_thru_server,ssh_password):
     print(batch_size,type(batch_size))
     worker=UBMRCNNWorker(broker_address,plane,weight_file,
                          batch_size,
+                         device_id=device_id,
                          ssh_thru_server=ssh_thru_server,
                          ssh_password=ssh_password,
                         )
@@ -22,6 +24,7 @@ def start_ubmrcnn_worker(broker_address,plane,weight_file,
 
 
 def startup_ubmrcnn_workers( broker_address, weights_files,
+                             device_id=0,
                              batch_size=1,
                              nplanes=[0,1,2],
                              ssh_thru_server=None, ssh_password=None,
@@ -34,7 +37,7 @@ def startup_ubmrcnn_workers( broker_address, weights_files,
     for p in nplanes:
         pworker = Process(target=start_ubmrcnn_worker,
                           args=(broker_address,p,weights_files[p],
-                                batch_size,
+                                device_id,batch_size,
                                 ssh_thru_server,ssh_password))
         pworker.daemon = True
         pworkers.append(pworker)

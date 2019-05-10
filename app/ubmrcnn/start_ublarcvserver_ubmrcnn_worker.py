@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os,sys,argparse,logging,time
 import getpass
 
@@ -20,6 +20,8 @@ parser.add_argument("-t","--ssh-tunnel",type=str,default=None,
                     help="Tunnel using SSH through the given IP address")
 parser.add_argument("-u","--ssh-user",type=str,default=None,
                     help="username for ssh tunnel command")
+parser.add_argument("-p","--plane",type=int,default=None,
+                    help="set single plane to run on")
 
 
 if __name__ == "__main__":
@@ -74,8 +76,12 @@ if __name__ == "__main__":
     workers_v = []
     log.info("starting the workers")
     for w in range(args.num_workers):
+        planes = [0,1,2]
+        if args.plane is not None:
+            planes = [args.plane]
         pworkers = startup_ubmrcnn_workers(endpoint,weights_files,
-                                           nplanes=[0,1,2],
+                                           device_id=int(args.mode),
+                                           nplanes=planes,
                                            batch_size=batch_size,
                                            ssh_thru_server=ssh_url,
                                            ssh_password=ssh_password)
