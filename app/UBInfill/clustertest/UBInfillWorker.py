@@ -64,8 +64,9 @@ class UBInfillWorker(MDPyWorkerBase):
 
         # ----------------------------------------------------------------------
         # import model - change to my model
-        sys.path.append("/cluster/tufts/wongjiradlab/kmason03/uboonecode/ubdl/ublarcvserver/networks/infill")
-        from ub_uresnet_infill import UResNetInfill
+        #  sys.path.append("/cluster/tufts/wongjiradlab/kmason03/uboonecode/ubdl/ublarcvserver/networks/infill")
+        sys.path.append("/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill")
+	from ub_uresnet_infill import UResNetInfill
 
         if "cuda" not in device and "cpu" not in device:
             raise ValueError("invalid device name [{}]. Must str with name \
