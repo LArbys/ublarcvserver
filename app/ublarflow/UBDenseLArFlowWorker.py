@@ -128,7 +128,7 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
                 c_subrun = c_int()
                 c_event = c_int()
                 c_id = c_int()
-                imgdata = larcv.json.sparseimg_from_bson_pystring(data,
+                imgdata = larcv.json.sparseimg_from_bson_pybytes(data,
                                         c_run, c_subrun, c_event, c_id )
             except Exception as e:
                 self._log.error("Image Data in message part {}".format(imsg)
@@ -250,7 +250,7 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
 
             # convert to bson string
             rseid = rseid_v[setid]
-            bson = larcv.json.as_bson_pystring( sparseimg,
+            bson = larcv.json.as_bson_pybytes( sparseimg,
                                         rseid[0], rseid[1], rseid[2], rseid[3] )
             # compress
             compressed = zlib.compress(bson)
