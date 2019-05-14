@@ -46,7 +46,7 @@ if __name__ == "__main__":
     client.connect()
 
     #client.process_entry(0,args.tick)
-    client.process_entries()
+    client.process_entries(args.tick)
 
     print("processed")
 
