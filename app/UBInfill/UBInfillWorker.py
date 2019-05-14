@@ -192,11 +192,13 @@ class UBInfillWorker(MDPyWorkerBase):
         # now make into torch tensor
         img2d_batch_t = torch.from_numpy( img_batch_np ).to(self.device)
         # out_batch_np = img2d_batch_t.detach().cpu().numpy()
-        # img2d_batch_t=np.transpose(img2d_batch_t,(0,1,3,2)).detach().cpu()
+        # out_batch_np=np.transpose(out_batch_np,(0,1,3,2))
+
         print("shape of image: ",img2d_batch_t.shape)
         with torch.set_grad_enabled(False):
             out_batch_np = self.model.forward(img2d_batch_t).detach().cpu().numpy()
             out_batch_np=np.transpose(out_batch_np,(0,1,3,2))
+
 
 
         # compression techniques

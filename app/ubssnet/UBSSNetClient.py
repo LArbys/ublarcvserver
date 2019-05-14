@@ -201,7 +201,7 @@ class UBSSNetClient(Client):
                     c_subrun = c_int()
                     c_event = c_int()
                     c_id = c_int()
-                    replyimg = larcv.json.image2d_from_pystring(data,
+                    replyimg = larcv.json.image2d_from_pybytes(data,
                                 c_run, c_subrun, c_event, c_id )
                         #byref(c_run),byref(c_subrun),byref(c_event),byref(c_id))
                     rep_rse = (c_run.value,c_subrun.value,

@@ -65,6 +65,7 @@ class UBInfillWorker(MDPyWorkerBase):
         # ----------------------------------------------------------------------
         # import model - change to my model
         sys.path.append("/cluster/tufts/wongjiradlab/kmason03/uboonecode/ubdl/ublarcvserver/networks/infill")
+        # sys.path.append("/mnt/disk1/nutufts/kmason/ubdl/ublarcvserver/networks/infill")
         from ub_uresnet_infill import UResNetInfill
 
         if "cuda" not in device and "cpu" not in device:
@@ -139,7 +140,7 @@ class UBInfillWorker(MDPyWorkerBase):
                 c_subrun = c_int()
                 c_event = c_int()
                 c_id = c_int()
-                img2d = larcv.json.image2d_from_pystring(data,
+                img2d = larcv.json.image2d_from_pybytes(data,
                                         c_run, c_subrun, c_event, c_id )
             except:
                 self._log.error("Image Data in message part {}\
@@ -226,7 +227,7 @@ class UBInfillWorker(MDPyWorkerBase):
             # print("out_np",type(out_np))
             # print("meta",type(meta))
             out_img2d = larcv.as_image2d_meta( out_np, meta )
-            bson = larcv.json.as_pystring( out_img2d,
+            bson = larcv.json.as_pybytes( out_img2d,
                                 rseid[0], rseid[1], rseid[2], rseid[3] )
             compressed = zlib.compress(bson)
             reply.append(compressed)
