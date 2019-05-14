@@ -213,11 +213,11 @@ class UBDenseLArFlowClient(Client):
             y2u_sparse = larcv.SparseImage(y2u_v,thresh_v)
             y2v_sparse = larcv.SparseImage(y2v_v,thresh_v)
 
-            bson_src = larcv.json.as_bson_pystring(src_sparse,
+            bson_src = larcv.json.as_bson_pybytes(src_sparse,
                                           run, subrun, event, iset)
-            bson_y2u = larcv.json.as_bson_pystring(y2u_sparse,
+            bson_y2u = larcv.json.as_bson_pybytes(y2u_sparse,
                                           run, subrun, event, iset)
-            bson_y2v = larcv.json.as_bson_pystring(y2v_sparse,
+            bson_y2v = larcv.json.as_bson_pybytes(y2v_sparse,
                                           run, subrun, event, iset)
 
             nsize_uncompressed = 2*len(bson_src)+len(bson_y2u)+len(bson_y2v)
@@ -271,7 +271,7 @@ class UBDenseLArFlowClient(Client):
                     c_subrun = c_int()
                     c_event = c_int()
                     c_id = c_int()
-                    replyimg = larcv.json.sparseimg_from_bson_pystring(data,
+                    replyimg = larcv.json.sparseimg_from_bson_pybytes(data,
                                 c_run, c_subrun, c_event, c_id ).as_Image2D()
                     #byref(c_run),byref(c_subrun),byref(c_event),byref(c_id))
                     rep_rse = (c_run.value,c_subrun.value,c_event.value)
