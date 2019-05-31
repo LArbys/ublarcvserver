@@ -97,9 +97,9 @@ class UBMRCNNWorker(MDPyWorkerBase):
         if self._use_half:
             print("Using half of mrcnn not tested")
             assert 1==2
-        service_name = "ubmrcnn_plane%d"%(self.plane)        
+        service_name = "ubmrcnn_plane%d"%(self.plane)
         super(UBMRCNNWorker,self).__init__( service_name,
-                                            broker_address, **kwargs)                    
+                                            broker_address, **kwargs)
 
         #Get Configs going:
         self.dataset = datasets.get_particle_dataset()
@@ -155,7 +155,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
             locations["cuda:%d"%(x)] = "cpu"
         checkpoint = torch.load(weight_file, map_location=locations)
 
-        self.device_id = device_id        
+        self.device_id = device_id
         if device_id==None:
             self.device = torch.device("cpu")
         else:
@@ -168,7 +168,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
                                        output_device=0)  # only support single GPU
         self.model.eval()
         #for x,t in self.model.state_dict().items():
-        #    print(x,t.device)        
+        #    print(x,t.device)
 
 
     def make_reply(self,request,nreplies):
@@ -268,20 +268,18 @@ class UBMRCNNWorker(MDPyWorkerBase):
             meta = img2d_v[img_num].meta()
             height = img_batch_np.shape[2]
             width = img_batch_np.shape[3]
-            im = np.zeros ((width,height,3))
-            im_visualize = np.zeros ((width,height,3), 'float32')
-            for h in range(img_batch_np.shape[2]):
-                for w in range(img_batch_np.shape[3]):
-                    value = img_batch_np[img_num][0][h][w]
-                    im[w][h][:] = value
-
-                    if value > 255:
-                        value2 =250
-                    elif value < 0:
-                        value2 =0
-                    else:
-                        value2  = value
-                    im_visualize[w][h][:]= value2
+            # Old and Slow:
+            # im = np.zeros ((width,height,3))
+            #
+            # for h in range(img_batch_np.shape[2]):
+            #     for w in range(img_batch_np.shape[3]):
+            #         value = img_batch_np[img_num][0][h][w]
+            #         im[w][h][:] = value
+            #
+            # print("im.shape", im.shape)
+            # New and Fast
+            im = np.array([np.copy(img_batch_np[0][0]),np.copy(img_batch_np[0][0]),np.copy(img_batch_np[0][0])])
+            im = np.moveaxis(np.moveaxis(im,0,2),0,1)
 
             assert im is not None
             thresh = 0.7
