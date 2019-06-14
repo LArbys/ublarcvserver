@@ -109,6 +109,11 @@ class UBMRCNNWorker(MDPyWorkerBase):
         print('load cfg from file: {}'.format("mills_config_"+str(plane)+".yaml"))
         cfg_from_file("mills_config_"+str(plane)+".yaml")
         cfg.MODEL.LOAD_IMAGENET_PRETRAINED_WEIGHTS = False  # Don't need to load imagenet pretrained weights
+        print(device_id)
+        if device_id != None:
+            cfg.MODEL.DEVICE = device_id
+        else:
+            cfg.MODEL.DEVICE = "cpu"
         assert_and_infer_cfg()
 
         # self.load_model(weight_file,device,self._use_half)
@@ -155,17 +160,21 @@ class UBMRCNNWorker(MDPyWorkerBase):
             locations["cuda:%d"%(x)] = "cpu"
         checkpoint = torch.load(weight_file, map_location=locations)
 
-        self.device_id = device_id
-        if device_id==None:
-            self.device = torch.device("cpu")
-        else:
-            self.device = torch.device("cuda:%d"%(device_id))
+        # self.device = device_id
+        # if device_id==None:
+        #     self.device = torch.device("cpu")
+        # else:
+        #     self.device = torch.device("cuda:%d"%(device_id))
 
 
         net_utils.load_ckpt(self.model, checkpoint['model'])
-        self.model = mynn.DataParallel(self.model, cpu_keywords=['im_info', 'roidb'],
-                                       minibatch=True, device_ids=[0],
-                                       output_device=0)  # only support single GPU
+        # self.model = mynn.DataParallel(self.model, cpu_keywords=['im_info', 'roidb'],
+        #                                minibatch=True, device_ids=[0],
+        #                                output_device=0)  # only support single GPU
+
+        self.model = mynn.DataSingular(self.model, cpu_keywords=['im_info', 'roidb'],
+                                     minibatch=True , device_id=[cfg.MODEL.DEVICE])
+
         self.model.eval()
         #for x,t in self.model.state_dict().items():
         #    print(x,t.device)
@@ -222,7 +231,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
             if img2d.meta().plane()!=self.plane:
                 self._log.debug("Image[{}] is the wrong plane!".format(imsg))
                 continue
-
+            print("Worker Has message, working...")
             # check that same size as previous images
             imgsize = (int(img2d.meta().cols()),int(img2d.meta().rows()))
             if len(sizes)==0:
@@ -323,7 +332,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
                         # print(cmask.points_v.at(0).x, cmask.points_v.at(0).y)
                         # print(cmask.points_v.at(1).x, cmask.points_v.at(1).y)
             clustermasks_all_imgs.append(clustermasks_this_img)
-
+        print("Mask Count:", mask_count, " in plane: ", self.plane)
         # remove background values
         out_batch_np = img_batch_np
         # print("type(out_batch_np)", type(out_batch_np))

@@ -4,21 +4,10 @@ MODEL:
   NUM_CLASSES: 7
   FASTER_RCNN: True
   MASK_ON: True
-  LOAD_IMAGENET_PRETRAINED_WEIGHTS: False
-  # DEVICE: 'cuda:0'
-  DEVICE: 'cpu'
-  # Options include 'cpu', 'cuda:0'
-  # tensor.to(torch.device(DEVICE))
-  # get_device() returns the torch.device a tensor is on, but make sure to check
-  # if the tensor is on a gpu first with tensor.is_cuda false -> cpu
 RESNETS:
   IMAGENET_PRETRAINED_WEIGHTS: 'data/pretrained_model/resnet50_caffe.pth'
-  # IMAGENET_PRETRAINED_WEIGHTS: 'blargflargmcbard'
-  FREEZE_AT: 0
-
-SYNCHRONIZE: False
 NUM_GPUS: 1
-PLANE: 1
+PLANE: 0
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
@@ -26,7 +15,7 @@ SOLVER:
   #was .01
   GAMMA: 0.1
   # 1x schedule (note TRAIN.IMS_PER_BATCH: 1)
-  MAX_ITER: 1 #274500
+  MAX_ITER: 120000 #274500
   STEPS: [0]
 RPN:
   SIZES: (32, 64, 128, 256, 512)
@@ -46,16 +35,16 @@ MRCNN:
   DILATION: 1  # default 2
   CONV_INIT: MSRAFill  # default: GaussianFill
 TRAIN:
-  SNAPSHOT_ITERS: 10000
+  SNAPSHOT_ITERS: 5000
   SCALES: (512,)
   MAX_SIZE: 832
   IMS_PER_BATCH: 1
-  BATCH_SIZE_PER_IM: 512
+  BATCH_SIZE_PER_IM: 256
   MAKE_IMAGES: False
-  #originally 0.7
-  RPN_NMS_THRESH: 0.1
+  # originally 0.7 (in ported model)
+  RPN_NMS_THRESH: 0.7
+  # Flip these on at 2 Epochs (200k iter at 2 gpus)
   # RPN_NMS_THRESH: 0.5
-
   # GT_IOU_THRESH: 0.2
 TEST:
   SCALE: 1008

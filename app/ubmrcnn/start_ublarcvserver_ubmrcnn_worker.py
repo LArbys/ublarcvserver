@@ -27,12 +27,11 @@ parser.add_argument("-p","--plane",type=int,default=None,
 if __name__ == "__main__":
 
     args = parser.parse_args(sys.argv[1:])
-
     from ublarcvserver import Broker
     from start_ubmrcnn_worker import startup_ubmrcnn_workers
 
     #set up CUDA_VISIBLE_DEVICES
-    os.environ["CUDA_VISIBLE_DEVICES"]=args.mode
+    # os.environ["CUDA_VISIBLE_DEVICES"]=args.mode
 
     level = logging.INFO
     if args.debug:
@@ -80,7 +79,7 @@ if __name__ == "__main__":
         if args.plane is not None:
             planes = [args.plane]
         pworkers = startup_ubmrcnn_workers(endpoint,weights_files,
-                                           device_id=int(args.mode),
+                                           device_id=args.mode,
                                            nplanes=planes,
                                            batch_size=batch_size,
                                            ssh_thru_server=ssh_url,

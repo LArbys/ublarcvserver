@@ -4,21 +4,10 @@ MODEL:
   NUM_CLASSES: 7
   FASTER_RCNN: True
   MASK_ON: True
-  LOAD_IMAGENET_PRETRAINED_WEIGHTS: False
-  # DEVICE: 'cuda:0'
-  DEVICE: 'cpu'
-  # Options include 'cpu', 'cuda:0'
-  # tensor.to(torch.device(DEVICE))
-  # get_device() returns the torch.device a tensor is on, but make sure to check
-  # if the tensor is on a gpu first with tensor.is_cuda false -> cpu
 RESNETS:
   IMAGENET_PRETRAINED_WEIGHTS: 'data/pretrained_model/resnet50_caffe.pth'
-  # IMAGENET_PRETRAINED_WEIGHTS: 'blargflargmcbard'
-  FREEZE_AT: 0
-
-SYNCHRONIZE: False
-NUM_GPUS: 1
-PLANE: 1
+NUM_GPUS: 2
+PLANE: 2
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
@@ -26,7 +15,7 @@ SOLVER:
   #was .01
   GAMMA: 0.1
   # 1x schedule (note TRAIN.IMS_PER_BATCH: 1)
-  MAX_ITER: 1 #274500
+  MAX_ITER: 320000 #274500
   STEPS: [0]
 RPN:
   SIZES: (32, 64, 128, 256, 512)
