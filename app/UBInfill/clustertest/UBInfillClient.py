@@ -318,12 +318,12 @@ class UBInfillClient(Client):
             ev_infill.Append(outputimg)
             ev_input.Append(wholeview_v.at(p))
 
-    def process_entries(self,start=0, end=-1):
+    def process_entries(self,tick_backwards, start=0, end=-1):
         if end<0:
             end = self.get_entries()-1
 
         for ientry in xrange(start,end+1):
-            self.process_entry(ientry)
+            self.process_entry(ientry,tick_backwards)
 
     def finalize(self):
         self._inlarcv.finalize()

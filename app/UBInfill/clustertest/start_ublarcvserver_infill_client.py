@@ -45,7 +45,8 @@ if __name__ == "__main__":
                             args.adc,args.chstatus,args.tick, args.infill)
     client.connect()
 
-    client.process_entry(0,args.tick)
+    #client.process_entry(0,args.tick)
+    client.process_entries(args.tick)
 
     print("processed")
 
