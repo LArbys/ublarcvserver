@@ -57,9 +57,10 @@ def startup_ubssnet_workers( broker_address, weights_files,
 if __name__ == "__main__":
 
     # endpoint:
-    endpoint  = "tcp://localhost:6005"
-    bindpoint = "tcp://*:6005"
-    weights_dir = "/home/twongjirad/working/nutufts/pytorch-uresnet/weights/"
+    endpoint  = "tcp://localhost:6000"
+    bindpoint = "tcp://*:6000"
+    #weights_dir = "/home/twongjirad/working/nutufts/pytorch-uresnet/weights/"
+    weights_dir = "/home/taritree/working/larbys/ubdl/ublarcvserver/networks/pytorch-uresnet/weights/"
     weights_files = {0:weights_dir+"/mcc8_caffe_ubssnet_plane0.tar",
                      1:weights_dir+"/mcc8_caffe_ubssnet_plane1.tar",
                      2:weights_dir+"/mcc8_caffe_ubssnet_plane2.tar"}

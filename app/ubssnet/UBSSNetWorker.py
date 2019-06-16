@@ -13,7 +13,7 @@ class UBSSNetWorker(MDPyWorkerBase):
 
     def __init__(self,broker_address,plane,
                  weight_file,device,batch_size,
-                 use_half=False,
+                 use_half=False,use_compression=False,
                  **kwargs):
         """
         Constructor
@@ -24,6 +24,8 @@ class UBSSNetWorker(MDPyWorkerBase):
         plane int Plane ID number. Currently [0,1,2] only
         weight_file str path to files with weights
         batch_size int number of batches to process in one pass
+        use_half bool if true, run inference in half-precision
+        use_compression bool if true, compress serialized image data 
         """
         if type(plane) is not int:
             raise ValueError("'plane' argument must be integer for plane ID")
@@ -40,6 +42,7 @@ class UBSSNetWorker(MDPyWorkerBase):
         self.batch_size = batch_size
         self._still_processing_msg = False
         self._use_half = use_half
+        self._use_compression = use_compression
         service_name = "ubssnet_plane%d"%(self.plane)
 
         super(UBSSNetWorker,self).__init__( service_name,
@@ -109,21 +112,33 @@ class UBSSNetWorker(MDPyWorkerBase):
         frames_used = []
         rseid_v = []
         for imsg in xrange(self._next_msg_id,nmsgs):
-            try:
-                compressed_data = str(request[imsg])
-                data = zlib.decompress(compressed_data)
-                c_run = c_int()
-                c_subrun = c_int()
-                c_event = c_int()
-                c_id = c_int()
-                img2d = larcv.json.image2d_from_pystring(data,
-                                        c_run, c_subrun, c_event, c_id )
-            except:
-                self._log.error("Image Data in message part {}\
-                                could not be converted".format(imsg))
-                continue
+            c_run = c_int()
+            c_subrun = c_int()
+            c_event = c_int()
+            c_id = c_int()
+            
+            if self._use_compression:
+                try:
+                    compressed_data = str(request[imsg])
+                    data  = zlib.decompress(compressed_data)
+                    img2d = larcv.json.image2d_from_pybytes(data,
+                                                            c_run, c_subrun, c_event, c_id )
+                except:
+                    self._log.error("Image Data (compressed) in message part {}\
+                    could not be converted".format(imsg))
+                    continue
+            else:
+                try:
+                    img2d = larcv.json.image2d_from_pybytes(str(request[imsg]),
+                                                            c_run, c_subrun, c_event, c_id )
+                except:
+                    self._log.error("Image Data (uncompressed) in message part {}\
+                    could not be converted".format(imsg))
+                    continue                   
+                
             self._log.debug("Image[{}] converted: {}"\
                             .format(imsg,img2d.meta().dump()))
+
 
             # check if correct plane!
             if img2d.meta().plane()!=self.plane:
@@ -202,9 +217,12 @@ class UBSSNetWorker(MDPyWorkerBase):
             for ich in xrange(out_batch_np.shape[1]):
                 out_np = out_batch_np[iimg,ich,:,:]
                 out_img2d = larcv.as_image2d_meta( out_np, meta )
-                bson = larcv.json.as_pystring( out_img2d,
+                bson = larcv.json.as_pybytes( out_img2d,
                                     rseid[0], rseid[1], rseid[2], rseid[3] )
-                compressed = zlib.compress(bson)
+                if self._use_compression:
+                    compressed = zlib.compress(bson)
+                else:
+                    compressed = bson
                 reply.append(compressed)
 
         if self._next_msg_id>=nmsgs:
