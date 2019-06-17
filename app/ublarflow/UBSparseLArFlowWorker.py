@@ -1,8 +1,9 @@
-import os,sys,logging, zlib
+import os,sys,time,logging,zlib
 import numpy as np
 from larcv import larcv
 from ctypes import c_int
 from ublarcvserver import MDPyWorkerBase, Broker, Client
+from sparsemodels import load_models
 larcv.json.load_jsonutils()
 
 """
@@ -13,7 +14,7 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
 
     def __init__(self,broker_address,plane,
                  weight_file,device,batch_size,
-                 use_half=False,
+                 use_half=False,use_compression=False,
                  **kwargs):
         """
         Constructor
@@ -45,6 +46,7 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
         self.batch_size = batch_size
         self._still_processing_msg = False
         self._use_half = use_half
+        self._use_compression = use_compression
         service_name = "ublarflow_plane%d"%(self.plane)
 
         super(UBSparseLArFlowWorker,self).__init__( service_name,
@@ -52,8 +54,10 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
 
         self.load_model(weight_file,device,self._use_half)
         if self.is_model_loaded():
-            self._log.info("Loaded ubSSNet model. Service={}"\
-                            .format(service_name))
+            self._log.info("LOADED SPARSE-LARFLOW model. Service={} on device={}"\
+                            .format(service_name,device))
+        else:
+            raise RuntimeError("ERROR LOADING UBSparseLArFlow Model")
 
     def load_model(self,weight_file,device,use_half):
         """
@@ -78,23 +82,19 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
                             +"Exception: {}".format(e))
 
         if "cuda" not in device and "cpu" not in device:
-            raise ValueError("invalid device name [{}]. Must str with name \
-                                \"cpu\" or \"cuda:X\" where X=device number")
+            print ("cuda" not in device)
+            raise ValueError("invalid device name ['{}' type={}]. Must str with name \
+                                \"cpu\" or \"cuda:X\" where X=device number".format(device,type(device)))
 
         self._log = logging.getLogger(self.idname())
 
         self.device = torch.device(device)
         if not self._use_half:
-            self.model = SparseLArFlow( (1024,3456), 2, 16, 16, 4 ).to(self.device)
+            self.model = load_models("dualflow_v1",weight_file=weight_file).to(device=self.device)
         else:
-            self.model = SparseLArFlow( (1024,3456), 2, 16, 16, 4 ).half().to(self.device)
+            self.model = load_models("dualflow_v1",weight_file=weight_file).half().to(device=self.device)
 
-        map_locations = {"cuda:0":device} # need to fix the weights by removing crap
-        params = torch.load(weight_file,map_location=map_locations)
-        self.model.load_state_dict(params["state_dict"])
         self.model.eval()
-        self.outlayer1 = scn.OutputLayer(2)
-        self.outlayer2 = scn.OutputLayer(2)
 
     def make_reply(self,request,nreplies):
         """we load each image and pass it through the net.
@@ -126,22 +126,26 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
         if not self._still_processing_msg:
             self._next_msg_id = 0
 
-        # turn message pieces into numpy arrays
-        imgdata_v  = [] # actual sparse img
-        sizes    = [] # tuples with (rows,cols,nfeatures,npoints)
+        # turn message pieces into larcv::SparseImage
+        imgdata_v   = [] # actual sparse img
+        sizes       = [] # tuples with (rows,cols,nfeatures,npoints)
         frames_used = []
-        rseid_v = []
-        totalpts = 0
+        rseid_v     = []
+        totalpts    = 0
         for imsg in xrange(self._next_msg_id,nmsgs):
-            try:
+            if self._use_compression:
                 compressed_data = str(request[imsg])
                 data = zlib.decompress(compressed_data)
+            else:
+                data = str(request[imsg])
+
+            try:
                 c_run = c_int()
                 c_subrun = c_int()
                 c_event = c_int()
                 c_id = c_int()
-                imgdata = larcv.json.sparseimg_from_bson_pystring(data,
-                                        c_run, c_subrun, c_event, c_id )
+                imgdata = larcv.json.sparseimg_from_bson_pybytes(data,
+                                                                  c_run, c_subrun, c_event, c_id )
             except Exception as e:
                 self._log.error("Image Data in message part {}".format(imsg)
                                 +" could not be converted: {}".format(e))
@@ -152,7 +156,7 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
 
             # get source meta
             print "nmeta=",imgdata.meta_v().size()
-            srcmeta = imgdata.meta_v().front()
+            srcmeta = imgdata.meta_v().at(2)
             print "srcmeta=",srcmeta.dump()
             # check if correct plane!
             if srcmeta.plane()!=self.plane:
@@ -172,6 +176,7 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
                                     we do not continue batch.")
                 self._next_msg_id = imsg
                 break
+            # append information about image
             totalpts += npts
             imgdata_v.append(imgdata)
             frames_used.append(imsg)
@@ -194,8 +199,8 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
         if self._use_half:
             np_dtype = np.float16
 
-        coord_np  = np.zeros( (totalpts,3), dtype=np.int )
-        srcpix_np = np.zeros( (totalpts,1), dtype=np_dtype )
+        coord_np        = np.zeros( (totalpts,3), dtype=np.int )
+        srcpix_np       = np.zeros( (totalpts,1), dtype=np_dtype )
         tarpix_flow1_np = np.zeros( (totalpts,1), dtype=np_dtype )
         tarpix_flow2_np = np.zeros( (totalpts,1), dtype=np_dtype )
 
@@ -207,7 +212,7 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
             start = nfilled
             end   = nfilled+npts
             coord_np[start:end,0:2] = data_np[:,0:2].astype(np.int)
-            coord_np[start:end,2]  = iimg
+            coord_np[start:end,2]   = iimg
 
             if not self._use_half:
                 srcpix_np[start:end,0]       = data_np[:,2]
@@ -220,21 +225,24 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
             nfilled = end
 
         # now make into torch tensors
-        coord_t  = torch.from_numpy( coord_np ).to(self.device)
-        srcpix_t = torch.from_numpy( srcpix_np ).to(self.device)
+        coord_t        = torch.from_numpy( coord_np ).to(self.device)
+        srcpix_t       = torch.from_numpy( srcpix_np ).to(self.device)
         tarpix_flow1_t = torch.from_numpy( tarpix_flow1_np ).to(self.device)
         tarpix_flow2_t = torch.from_numpy( tarpix_flow2_np ).to(self.device)
 
-        # run model
-        predict1_t, predict2_t = self.model(coord_t, srcpix_t,
-                                            tarpix_flow1_t, tarpix_flow2_t,
-                                            len(imgdata_v))
+        # run model: whole batch run at once
+        tforward = time.time()
+        with torch.set_grad_enabled(False):
+            predict1_t, predict2_t = self.model(coord_t, srcpix_t,
+                                                tarpix_flow1_t, tarpix_flow2_t,
+                                                len(imgdata_v))
 
-        out1_t = self.outlayer1(predict1_t).detach().cpu().numpy()
-        out2_t = self.outlayer2(predict2_t).detach().cpu().numpy()
+        out1_t = predict1_t.features.detach().cpu().numpy()
+        out2_t = predict2_t.features.detach().cpu().numpy()
+        dtforward = time.time()-tforward
 
-        self._log.debug("passed images through net. output batch shape={}"
-                        .format(out1_t.shape))
+        self._log.debug("passed images through net. input: {}. output batch shape={}. time={} secs"
+                        .format(coord_t.shape,out1_t.shape,dtforward))
 
         # now need to make individual images
 
@@ -247,14 +255,14 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
             end       = start+npts
             nfeatures = 2
             # make numpy array to remake sparseimg
-            sparse_np = np.zeros( (npts,2+nfeatures), dtype=np.float32 )
+            sparse_np        = np.zeros( (npts,2+nfeatures), dtype=np.float32 )
             sparse_np[:,0:2] = coord_np[start:end,0:2]
             sparse_np[:,2]   = out1_t[start:end,0]
             sparse_np[:,3]   = out2_t[start:end,0]
 
             outmeta_v = std.vector("larcv::ImageMeta")()
-            outmeta_v.push_back( imgdata.meta_v().front() )
-            outmeta_v.push_back( imgdata.meta_v().front() )
+            outmeta_v.push_back( imgdata.meta_v().at(2) )
+            outmeta_v.push_back( imgdata.meta_v().at(2) )
 
             # make the sparseimage object
             sparseimg = larcv.sparseimg_from_ndarray( sparse_np,
@@ -262,10 +270,13 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
                                                       larcv.msg.kNORMAL )
 
             # convert to bson string
-            bson = larcv.json.as_bson_pystring( sparseimg,
-                                        rseid[0], rseid[1], rseid[2], rseid[3] )
+            bson = larcv.json.as_bson_pybytes( sparseimg,
+                                                rseid[0], rseid[1], rseid[2], rseid[3] )
             # compress
-            compressed = zlib.compress(bson)
+            if self._use_compression:
+                compressed = zlib.compress(bson)
+            else:
+                compressed = bson
 
             # add to reply message list
             reply.append(compressed)
@@ -285,3 +296,17 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
 
     def is_model_loaded(self):
         return self.model is not None
+
+if __name__ == "__main__":
+
+    broker_address = "tcp://localhost:6009"
+    plane='Y'
+    weight_file="checkpoint.19400th.tar"
+    device="cpu"
+    batch_size=1
+    worker=UBSparseLArFlowWorker(broker_address,plane,weight_file,
+                                 device,batch_size)
+    worker.connect()
+    print "worker started: ",worker.idname()
+    worker.run()
+

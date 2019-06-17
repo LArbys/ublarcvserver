@@ -15,11 +15,13 @@ class UBSparseLArFlowClient(Client):
                  larcv_supera_file,
                  output_larcv_filename,
                  adc_producer="wire",
-                 sparseimage_input_producer="larflowy2u",
-                 sparseimage_output_producer="larflowY",
+                 sparseimage_input_producer="larflow",
+                 sparseimage_output_producer="dualflow",
                  has_sparseimage_data=False,
                  save_as_sparseimg=False,
                  tick_backwards=False,
+                 use_compression=False,
+                 cropper_cfg="ubcrop.cfg",
                  **kwargs):
         """
         this class loads either larcv::sparseimage or larcv::image2d data from
@@ -33,10 +35,21 @@ class UBSparseLArFlowClient(Client):
         tick_direction = larcv.IOManager.kTickForward
         if tick_backwards:
             tick_direction = larcv.IOManager.kTickBackward
-        self._inlarcv = larcv.IOManager(larcv.IOManager.kREAD,"",
-                                        tick_direction)
-        self._inlarcv.add_in_file(larcv_supera_file)
-        self._inlarcv.initialize()
+
+        # setup splitter: for processing wholeview images
+        if not has_sparseimage_data:
+            self.splitter = larcv.ProcessDriver( "ProcessDriver" )
+            self.splitter.configure( cropper_cfg )
+            infiles = std.vector("std::string")()
+            infiles.push_back( larcv_supera_file )
+            self.splitter.override_input_file(infiles)
+            self.splitter.initialize()
+            self._inlarcv = self.splitter.io_mutable()            
+        else:
+            self._inlarcv = larcv.IOManager(larcv.IOManager.kREAD,"",
+                                            tick_direction)
+            self._inlarcv.add_in_file(larcv_supera_file)
+            self._inlarcv.initialize()
 
         # setup output iomanager
         self._outlarcv = larcv.IOManager(larcv.IOManager.kWRITE)
@@ -49,18 +62,17 @@ class UBSparseLArFlowClient(Client):
         self._sparseimage_output_producer=sparseimage_output_producer
         self._use_sparseimage_data=has_sparseimage_data
         self._save_as_sparseimg=save_as_sparseimg
+        self._use_compression = use_compression
 
         # thresholds: adc values must be above this value to be included
-        self._threshold_v   = std.vector("float")(3,5.0)
+        self._threshold_v   = std.vector("float")(3,10.0)
         # cuton flag: if pixel passes in the given plane, we save values in all three
         #             this is required because of the submanifold structure
         self._cuton_pixel_v = std.vector("int")(3,1)
 
+
         # setup logger
         self._log = logging.getLogger(__name__)
-
-
-
 
     def get_entries(self):
         return self._inlarcv.get_n_entries()
@@ -77,57 +89,48 @@ class UBSparseLArFlowClient(Client):
             raise RuntimeError("could not read larcv entry %d"%(entry_num))
 
         # get data
-        # we either get the ADC image or the sparseimage
+        # we either split the ADC image or get cropped sparseimage data
         if self._use_sparseimage_data:
             # load sparseimage data
             ev_sparseimg = self._inlarcv.get_data(larcv.kProductSparseImage,
                                                   self._sparseimage_input_producer)
-            if ev_sparseimg.Image2DArray().size()>0:
-                sparsedata = ev_sparseimg.Image2DArray().front()
-            else:
-                sparsedata = None
+            sparseimg_v = ev_sparseimg.SparseImageArray()
         else:
-            # make sparseimage from wholeview images
-            ev_wholeview = self._inlarcv.get_data(larcv.kProductImage2D,
-                                                  self._adc_producer)
-            wholeview_v = ev_wholeview.Image2DArray()
+            # we must split the image
+            self.splitter.process_entry( entry_num, False, False )
+            ev_cropped = self.splitter.io_mutable().get_data(larcv.kProductImage2D, "detsplit")
+            cropped_v = ev_cropped.Image2DArray()
+            self._log.debug("cropped wholeview image into {} crop sets (total: {})".format(cropped_v.size()/3,cropped_v.size()))
+            sparseimg_v = std.vector("larcv::SparseImage")()
+            for iset in xrange( cropped_v.size()/3 ):
+                sparsedata = larcv.SparseImage( cropped_v, iset*3, iset*3+2, self._threshold_v, self._cuton_pixel_v )
+                sparseimg_v.push_back( sparsedata )
+            
+        self._log.debug("prepared {} sparse numpy arrays for processing.".format( sparseimg_v.size() ))
 
-            if wholeview_v.size()==3:
-                # prepare the source Y-plane flow
-                flowset_v = std.vector("larcv::Image2D")()
-                flowset_v.push_back( wholeview_v.at(2) )
-                flowset_v.push_back( wholeview_v.at(0) )
-                flowset_v.push_back( wholeview_v.at(1) )
-                sparsedata = larcv.SparseImage(flowset_v,
-                                               self._threshold_v,
-                                               self._cuton_pixel_v)
-                print "prepared sparseimage. nfeatures=",sparsedata.nfeatures()," npts=",sparsedata.pixellist().size()/float(2+3)
-                print "image2d metas: "
-                for iimg in xrange(wholeview_v.size()):
-                    print "  ",wholeview_v.at(iimg).meta().dump()
-                print "sparseimg metas: "
-                for iimg in xrange(sparsedata.meta_v().size()):
-                    print "  ",sparsedata.meta_v().at(iimg).dump()
-
-        nplanes = wholeview_v.size()
+        # get whole adc image
+        #ev_wholeview = self._inlarcv.get_data(larcv.kProductImage2D,
+        #                                      self._adc_producer)
+        #wholeview_v = ev_wholeview.Image2DArray()
+        #nplanes = wholeview_v.size()
         run    = self._inlarcv.event_id().run()
         subrun = self._inlarcv.event_id().subrun()
         event  = self._inlarcv.event_id().event()
-        print "num of planes in entry {}: ".format((run,subrun,event)),nplanes
+        print "prcessing entry {}: ".format((run,subrun,event))
 
 
         # send messages
-        if sparsedata is not None:
-            replies = self.send_sparsedata(sparsedata,run=run,subrun=subrun,event=event)
+        if sparseimg_v.size()>0:
+            replies = self.send_sparseimages(sparseimg_v,run=run,subrun=subrun,event=event)
             if len(replies)>0:
-                self.process_received_images(replies[0])
+                self.process_received_images(replies)
         else:
             # create blank
             evimg_outblank = self._outlarcv.get_data(larcv.kProductImage2D,
-                                             self.__sparseimage_output_producer)
+                                                     self._sparseimage_output_producer)
             if self._save_as_sparseimg:
                 evsp_blank = self._outlarcv.get_data(larcv.kProductSparseImage,
-                                             self.__sparseimage_output_producer)
+                                                     self._sparseimage_output_producer)
 
 
         self._outlarcv.set_id( self._inlarcv.event_id().run(),
@@ -137,6 +140,17 @@ class UBSparseLArFlowClient(Client):
         self._outlarcv.save_entry()
         return True
 
+    def send_sparseimages(self,sparseimg_v, run=0, subrun=0, event=0):
+        """
+        process all images in sparseimg_v vector
+
+        return list of sparseimage vectors containing replies for each input sparseimage
+        """
+        imgout_vv = []
+        for iimg in xrange(sparseimg_v.size()):
+            imgout_v = self.send_sparsedata( sparseimg_v.at(iimg), run, subrun, event )
+            imgout_vv.append( imgout_v )
+        return imgout_vv
 
     def send_sparsedata(self,sparsedata, run=0, subrun=0, event=0):
         """
@@ -145,17 +159,21 @@ class UBSparseLArFlowClient(Client):
 
         inputs
         ------
-        sparsedata larcv::SparseImage object to be sent
+        sparsedata dictionary with data to be sent. 
+                   primarily sparsedata["pixdata"] contaning list of SparseImage objects.
         run int run number to store in message
         subrun int subrun number to store in message
         event int event number to store in messsage
         """
 
         msg = [] # message components
-        bson = larcv.json.as_bson_pystring(sparsedata,
+        bson = larcv.json.as_bson_pybytes(sparsedata,
                                            run, subrun, event, 0)
         nsize_uncompressed = len(bson)
-        compressed = zlib.compress(bson)
+        if self._use_compression:
+            compressed = zlib.compress(bson)
+        else:
+            compressed = bson
         nsize_compressed   = len(compressed)
         msg.append(compressed)
         rse = (run,subrun,event)
@@ -181,15 +199,15 @@ class UBSparseLArFlowClient(Client):
             for reply in workerout:
                 data = str(reply)
                 received_compressed += len(data)
-                data = zlib.decompress(data)
+                if self._use_compression:
+                    data = zlib.decompress(data)
                 received_uncompressed += len(data)
                 c_run = c_int()
                 c_subrun = c_int()
                 c_event = c_int()
                 c_id = c_int()
-                replyimg = larcv.json.sparseimg_from_bson_pystring(data,
+                replyimg = larcv.json.sparseimg_from_bson_pybytes(data,
                                 c_run, c_subrun, c_event, c_id )
-                        #byref(c_run),byref(c_subrun),byref(c_event),byref(c_id))
                 rep_rse = (c_run.value,c_subrun.value,c_event.value)
                 self._log.debug("rec images with rse={}".format(rep_rse))
                 if rep_rse!=rse:
@@ -201,7 +219,7 @@ class UBSparseLArFlowClient(Client):
                 self._log.debug("running total, converted images: {}"
                                 .format(len(imgout_v)))
             complete = True
-            # should be a multiple of 2: (shower,track)
+
             if len(imgout_v)!=1:
                 complete = False
 
@@ -216,22 +234,26 @@ class UBSparseLArFlowClient(Client):
                         %(received_compressed/1.0e6, received_uncompressed/1.0e6))
         return imgout_v
 
-    def process_received_images(self, sparseimg):
+    def process_received_images(self, sparseimg_vv):
         """ receive the list of images from the worker """
 
         evimg_output = self._outlarcv.\
                         get_data(larcv.kProductImage2D,
                                  self._sparseimage_output_producer)
-        # convert into images
-        dense_img_v = sparseimg.as_Image2D()
-        for iimg in xrange(dense_img_v.size()):
-            evimg_output.Append( dense_img_v.at(iimg) )
 
         if self._save_as_sparseimg:
             evsparse_output = self._outlarcv.\
                         get_data(larcv.kProductSparseImage,
                                 self._sparseimage_output_producer)
-            evsparse_output.Append( sparseimg )
+        
+        # convert into images
+        for sparseimg_v in sparseimg_vv:
+            for sparseimg in sparseimg_v:
+                dense_img_v = sparseimg.as_Image2D()
+                for iimg in xrange(dense_img_v.size()):
+                    evimg_output.Append( dense_img_v.at(iimg) )
+                if self._save_as_sparseimg:
+                    evsparse_output.Append( sparseimg )
 
         return True
 
