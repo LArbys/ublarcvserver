@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-sys.path.append("/mnt/disk1/nutufts/kmason/sparsenet/SparseConvNet")
 import sparseconvnet as scn
 
 import time

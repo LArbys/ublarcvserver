@@ -64,7 +64,7 @@ class UBInfillSparseWorker(MDPyWorkerBase):
 
         # ----------------------------------------------------------------------
         # import model - change to my model
-        sys.path.append("/mnt/disk1/nutufts/kmason/sparsenet/ubdl/ublarcvserver/networks/infill")
+        sys.path.append("../../../networks/infill")
         from sparseinfill import SparseInfill
 
         if "cuda" not in device and "cpu" not in device:

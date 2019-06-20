@@ -3,7 +3,7 @@ import os,sys,argparse,logging,time
 import getpass
 
 parser = argparse.ArgumentParser()
-parser.add_argument("brokeraddr",type=str,help="Broker Address")
+parser.add_argument("-brokeraddr",type=str,help="Broker Address")
 parser.add_argument("-l","--logfile",type=str, default=None,
                     help="where the log file is writen to")
 parser.add_argument("-d","--debug",action="store_true",
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     from ublarcvserver import Broker
-    from UBInfillClient import UBInfillClient
+    from UBInfillSparseClient import UBInfillSparseClient
 
     endpoint = args.brokeraddr
 
@@ -41,11 +41,12 @@ if __name__ == "__main__":
     log = logging.getLogger("start_ublarcvsever_worker_main")
     logging.basicConfig(level=logging.DEBUG)
 
-    client = UBInfillClient(args.brokeraddr,args.input,args.output,
+    client = UBInfillSparseClient(args.brokeraddr,args.input,args.output,
                             args.adc,args.chstatus,args.tick, args.infill)
     client.connect()
 
-    client.process_entry(0,args.tick)
+    #client.process_entry(0,args.tick)
+    client.process_entries()
 
     print("processed")
 

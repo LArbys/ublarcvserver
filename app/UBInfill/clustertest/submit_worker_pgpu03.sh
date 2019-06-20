@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #SBATCH --job-name=ubdl_workers_pgpu03_0
-#SBATCH --output=ubdl_workers_pgpu03_0.log
+#SBATCH --output=ubdl_workers_pgpu03_6.log
 #SBATCH --mem-per-cpu=12000
 #SBATCH --time=3-0:00:00
 #SBATCH --cpus-per-task=1
