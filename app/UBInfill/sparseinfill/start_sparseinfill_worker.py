@@ -8,13 +8,14 @@ Start the broker and worker. Run one client. Useful for tests.
 """
 
 def start_infill_worker(broker_address, plane,weight_file,
-                         device, batch_size,
+                         device, batch_size, use_compression,
                          ssh_thru_server, ssh_password):
     print(batch_size,type(batch_size))
     worker=UBInfillSparseWorker(broker_address,plane,weight_file,
-                         device,batch_size,
-                         ssh_thru_server=ssh_thru_server,
-                         ssh_password=ssh_password)
+                                device,batch_size,
+                                use_compression=use_compression,
+                                ssh_thru_server=ssh_thru_server,
+                                ssh_password=ssh_password)
     worker.connect()
     print("worker started: ",worker.idname())
     worker.run()
@@ -23,6 +24,7 @@ def start_infill_worker(broker_address, plane,weight_file,
 def startup_infill_workers( broker_address,weights_file,
                              devices=["cuda","cuda","cuda"],
                              batch_size=1,
+                             use_compression=False,
                              nplanes=[0,1,2],
                              ssh_thru_server=None, ssh_password=None,
                              start=True):
@@ -40,7 +42,7 @@ def startup_infill_workers( broker_address,weights_file,
     for p,device in zip(nplanes,devices):
         pworker = Process(target=start_infill_worker,
                           args=(broker_address,p,weights_file[p],
-                                device,batch_size,
+                                device,batch_size, use_compression,
                                 ssh_thru_server,ssh_password))
         pworker.daemon = True
         pworkers.append(pworker)

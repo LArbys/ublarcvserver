@@ -20,14 +20,14 @@ parser.add_argument("-t","--ssh-tunnel",type=str,default=None,
                     help="Tunnel using SSH through the given IP address")
 parser.add_argument("-u","--ssh-user",type=str,default=None,
                     help="username for ssh tunnel command")
-
+parser.add_argument("-c","--use-compression",action="store_true",default=False,
+                    help="worker expects compressed image")
 
 if __name__ == "__main__":
 
     args = parser.parse_args(sys.argv[1:])
 
-    from ublarcvserver import Broker
-    from start_ubinfill_worker import startup_infill_workers
+    from start_sparseinfill_worker import startup_infill_workers
 
 
     level = logging.INFO
@@ -73,6 +73,7 @@ if __name__ == "__main__":
         pworkers = startup_infill_workers(endpoint,weights_files,
                                            nplanes=[0,1,2],
                                            devices=args.mode,
+                                           use_compression=args.use_compression,
                                            batch_size=batch_size,
                                            ssh_thru_server=ssh_url,
                                            ssh_password=ssh_password)

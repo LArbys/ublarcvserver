@@ -15,7 +15,7 @@ class UBInfillSparseWorker(MDPyWorkerBase):
 
     def __init__(self,broker_address,plane,
                  weight_file,device,batch_size,
-                 use_half=False,
+                 use_half=False,use_compression=False,
                  **kwargs):
         """
         Constructor
@@ -43,6 +43,7 @@ class UBInfillSparseWorker(MDPyWorkerBase):
         self.batch_size = batch_size
         self._still_processing_msg = False
         self._use_half = use_half
+        self._use_compression = use_compression
 
         service_name = "infill_plane%d"%(self.plane)
 
@@ -140,7 +141,10 @@ class UBInfillSparseWorker(MDPyWorkerBase):
         for imsg in xrange(self._next_msg_id,nmsgs):
             try:
                 compressed_data = str(request[imsg])
-                data = zlib.decompress(compressed_data)
+                if self._use_compression:
+                    data = zlib.decompress(compressed_data)
+                else:
+                    data = compressed_data
                 c_run = c_int()
                 c_subrun = c_int()
                 c_event = c_int()
@@ -253,9 +257,12 @@ class UBInfillSparseWorker(MDPyWorkerBase):
 
             # convert to bson string
             bson = larcv.json.as_bson_pybytes( sparseimg,
-                                        rseid[0], rseid[1], rseid[2], rseid[3] )
+                                               rseid[0], rseid[1], rseid[2], rseid[3] )
             # compress
-            compressed = zlib.compress(bson)
+            if self._use_compression:
+                compressed = zlib.compress(bson)
+            else:
+                compressed = bson
 
             # add to reply message list
             reply.append(compressed)
