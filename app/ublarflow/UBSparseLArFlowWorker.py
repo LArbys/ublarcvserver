@@ -156,7 +156,7 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
 
             # get source meta
             print "nmeta=",imgdata.meta_v().size()
-            srcmeta = imgdata.meta_v().at(2)
+            srcmeta = imgdata.meta_v().at(0)
             print "srcmeta=",srcmeta.dump()
             # check if correct plane!
             if srcmeta.plane()!=self.plane:
@@ -261,8 +261,8 @@ class UBSparseLArFlowWorker(MDPyWorkerBase):
             sparse_np[:,3]   = out2_t[start:end,0]
 
             outmeta_v = std.vector("larcv::ImageMeta")()
-            outmeta_v.push_back( imgdata.meta_v().at(2) )
-            outmeta_v.push_back( imgdata.meta_v().at(2) )
+            outmeta_v.push_back( imgdata.meta_v().at(0) )
+            outmeta_v.push_back( imgdata.meta_v().at(0) )
 
             # make the sparseimage object
             sparseimg = larcv.sparseimg_from_ndarray( sparse_np,
