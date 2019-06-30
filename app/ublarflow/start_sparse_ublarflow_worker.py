@@ -155,7 +155,7 @@ if __name__ == "__main__":
     log.info("Workers started")
     nalive = 1
     while nalive==1:
-        time.sleep(10)
+        time.sleep(20)
         nalive = 0
         for flowdir in ['dual']:
             if workers_v[flowdir].is_alive():
