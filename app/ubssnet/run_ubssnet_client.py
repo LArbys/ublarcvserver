@@ -37,5 +37,5 @@ if __name__ == "__main__":
 
     client.finalize()
 
-    print "[ENTER] to quit."
+    print("[ENTER] to quit.")
     raw_input()

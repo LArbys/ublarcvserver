@@ -1,5 +1,5 @@
 import os,sys
-from mdpyworkerbase import MDPyWorkerBase
+from .mdpyworkerbase import MDPyWorkerBase
 
 class DummyPyWorker(MDPyWorkerBase):
 

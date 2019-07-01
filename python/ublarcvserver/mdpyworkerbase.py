@@ -1,6 +1,6 @@
 import zmq
 import time, abc, logging
-import majortomo.protocol as p
+from .majortomo import protocol as p
 from zmq import ssh
 
 class MDPyWorkerBase(object):
@@ -28,7 +28,7 @@ class MDPyWorkerBase(object):
         self._ssh_password = ssh_password # this is terrible
 
         # set the zmq context
-        print "zmq_context:",zmq_context
+        print("zmq_context:",zmq_context)
         self._context = zmq_context if zmq_context else zmq.Context()
 
         self._socket = None  # type: zmq.Socket

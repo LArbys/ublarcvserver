@@ -1,0 +1,66 @@
+MODEL:
+  TYPE: generalized_rcnn
+  CONV_BODY: ResNet.ResNet50_conv4_body
+  NUM_CLASSES: 7
+  FASTER_RCNN: True
+  MASK_ON: True
+  LOAD_IMAGENET_PRETRAINED_WEIGHTS: False
+  # DEVICE: 'cuda:0'
+  DEVICE: 'cpu'
+  # Options include 'cpu', 'cuda:0'
+  # tensor.to(torch.device(DEVICE))
+  # get_device() returns the torch.device a tensor is on, but make sure to check
+  # if the tensor is on a gpu first with tensor.is_cuda false -> cpu
+RESNETS:
+  IMAGENET_PRETRAINED_WEIGHTS: 'data/pretrained_model/resnet50_caffe.pth'
+  # IMAGENET_PRETRAINED_WEIGHTS: 'blargflargmcbard'
+  FREEZE_AT: 0
+
+SYNCHRONIZE: False
+NUM_GPUS: 1
+PLANE: 0
+SOLVER:
+  WEIGHT_DECAY: 0.0001
+  LR_POLICY: steps_with_decay
+  BASE_LR: 0.005
+  #was .01
+  GAMMA: 0.1
+  # 1x schedule (note TRAIN.IMS_PER_BATCH: 1)
+  MAX_ITER: 1 #274500
+  STEPS: [0]
+RPN:
+  SIZES: (32, 64, 128, 256, 512)
+FAST_RCNN:
+  ROI_BOX_HEAD: ResNet.ResNet_roi_conv5_head
+  ROI_XFORM_METHOD: RoIAlign
+  ROI_XFORM_RESOLUTION: 14
+MRCNN:
+  WEIGHT_LOSS_MASK: 0.1
+  ROI_MASK_HEAD: mask_rcnn_heads.mask_rcnn_fcn_head_v0upshare
+  RESOLUTION: 448
+  ROI_XFORM_METHOD: RoIAlign
+  ROI_XFORM_RESOLUTION: 14
+  CLS_SPECIFIC_MASK: True
+  UPSAMPLE_RATIO:  32
+  #model_builder.py roi_feature_transform needs resol half this
+  DILATION: 1  # default 2
+  CONV_INIT: MSRAFill  # default: GaussianFill
+TRAIN:
+  SNAPSHOT_ITERS: 10000
+  SCALES: (512,)
+  MAX_SIZE: 832
+  IMS_PER_BATCH: 1
+  BATCH_SIZE_PER_IM: 512
+  MAKE_IMAGES: False
+  #originally 0.7
+  RPN_NMS_THRESH: 0.1
+  # RPN_NMS_THRESH: 0.5
+
+  # GT_IOU_THRESH: 0.2
+TEST:
+  SCALE: 1008
+  MAX_SIZE: 3456
+  NMS: 0.5
+  RPN_NMS_THRESH: 0.5
+  RPN_PRE_NMS_TOP_N: 12000
+  RPN_POST_NMS_TOP_N: 2000

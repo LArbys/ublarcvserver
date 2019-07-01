@@ -1,6 +1,6 @@
 import os,sys
 from multiprocessing import Process
-from majortomo.broker import Broker
+from .majortomo.broker import Broker
 
 def start_broker(broker_bind_address):
 

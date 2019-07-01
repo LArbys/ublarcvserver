@@ -55,7 +55,7 @@ model = load_model(...)
 
 def process_net( img_list_bson_str ):
   """
-  img_list_bson_str is a list of pystrings, with the contents being:
+  img_list_bson_str is a list of pybytes, with the contents being:
     ["imgtype",imgdata,"imgtype",imgdata,...]       
   """
   global model
