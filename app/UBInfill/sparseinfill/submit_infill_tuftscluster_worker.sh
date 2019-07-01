@@ -22,15 +22,16 @@ INFILL_DIR=/cluster/tufts/wongjiradlab/twongj01/ubdl/ublarcvserver/app/UBInfill
 # WEIGHT_DIR: location of weights
 WEIGHT_DIR=/cluster/tufts/wongjiradlab/larbys/dl_models/sparse_infill/prelim_june2019/
 
-# LOG_FILE
-LOG_DIR=/tmp/
-
 # WORKDIR: place for scripts
 WORKDIR=${INFILL_DIR}/sparseinfill
 
 # GPU_LIST
 #GPU_LIST=/cluster/tufts/wongjiradlab/kmason03/testdir/ubdl/ublarcvserver/app/UBInfill/sparseinfill/tufts_pgpu03_assignments.txt
 GPU_LIST=${WORKDIR}/tufts_pgpu03_assignments.txt
+
+# LOG_FILE
+#LOG_DIR=/tmp/
+LOG_DIR=${WORKDIR}/
 
 
 # IP ADDRESSES OF BROKER
