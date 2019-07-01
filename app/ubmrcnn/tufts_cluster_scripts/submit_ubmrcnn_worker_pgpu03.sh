@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --partition gpu
 #SBATCH --nodelist=pgpu03
-#SBATCH --array=0
+#SBATCH --array=4
 
 CONTAINER=/cluster/tufts/wongjiradlab/larbys/larbys-containers/singularity_ubdl_py3_deponly_070119.img
 

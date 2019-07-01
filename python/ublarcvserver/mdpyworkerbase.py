@@ -247,7 +247,7 @@ class MDPyWorkerBase(object):
                 socks = dict(self._poller.poll(timeout=poll_timeout))
             except zmq.error.ZMQError:
                 # Probably connection was explicitly closed
-                print "poll zmqError"
+                print("poll zmqError")
                 if self._socket is None:
                     continue
                 raise
