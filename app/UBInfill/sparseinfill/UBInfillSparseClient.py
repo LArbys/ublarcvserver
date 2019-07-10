@@ -17,10 +17,12 @@ larcv.json.load_jsonutils()
 class UBInfillSparseClient(Client):
 
     def __init__(self, broker_address,
-                    larcv_supera_file,
-                    output_larcv_filename,
-                    adc_producer="wire", chstatus_producer="wire",
-                    tick_backwards=False, infill_tree_name="infill",**kwargs):
+                 larcv_supera_file,
+                 output_larcv_filename,
+                 adc_producer="wire", chstatus_producer="wire",
+                 tick_backwards=False, infill_tree_name="infill",
+                 use_compression=False,
+                 **kwargs):
         """
         """
         super(UBInfillSparseClient,self).__init__(broker_address,**kwargs)
@@ -45,6 +47,7 @@ class UBInfillSparseClient(Client):
         self._chstatus_producer = chstatus_producer
 
         self._ubsplitdet = None
+        self._use_compression = use_compression
 
     def get_entries(self):
         return self._inlarcv.get_n_entries()
@@ -244,7 +247,11 @@ class UBInfillSparseClient(Client):
                 bson = larcv.json.as_bson_pybytes(img2d,run, subrun, event, img_id)
                 # print ("made bson")
                 nsize_uncompressed += len(bson)
-                compressed = zlib.compress(bson)
+                if self._use_compression:
+                    compressed = zlib.compress(bson)
+                    self._log.info("Compressing bson: {} to {} bytes".format(len(bson),len(compressed)))
+                else:
+                    compressed = bson
                 nsize_compressed   += len(compressed)
                 msg.append(compressed)
                 # we make a flag to mark if we got this back
@@ -261,13 +268,14 @@ class UBInfillSparseClient(Client):
                 if isfinal:
                     self._log.info("received done indicator by worker")
                     break
-                print ("num frames received from worker: {}"
-                                .format(len(workerout)))
+                self._log.debug("num frames received from worker: {}"
+                            .format(len(workerout)))
                 # use the time worker is preparing next part, to convert image
                 for reply in workerout:
                     data = str(reply)
                     received_compressed += len(data)
-                    data = zlib.decompress(data)
+                    if self._use_compression:
+                        data = zlib.decompress(data)
                     received_uncompressed += len(data)
                     c_run = c_int()
                     c_subrun = c_int()
