@@ -54,15 +54,15 @@ if __name__ == "__main__":
         broker = start_broker(endpoint)
 
         # weight files
-        weights_files = {0:weights_dir+"/mcc8_mrcnn_plane0.pth",
-                         1:weights_dir+"/mcc8_mrcnn_plane1.pth",
-                         2:weights_dir+"/mcc8_mrcnn_plane2.pth"}
+        weights_files = {0:args.weights_dir+"/mcc8_mrcnn_plane0.pth",
+                         1:args.weights_dir+"/mcc8_mrcnn_plane1.pth",
+                         2:args.weights_dir+"/mcc8_mrcnn_plane2.pth"}
                 
-        workers_v = startup_infill_workers(endpoint,
-                                           weights_files,
-                                           nplanes=[0,1,2],
-                                           device_id="cpu",
-                                           batch_size=1)     
+        workers_v = startup_ubmrcnn_workers(endpoint,
+                                            weights_files,
+                                            nplanes=[0,1,2],
+                                            device_id="cpu",
+                                            batch_size=1)     
     
 
     client = UBMRCNNClient(args.brokeraddr,args.input,args.output,
