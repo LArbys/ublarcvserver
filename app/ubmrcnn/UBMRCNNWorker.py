@@ -68,6 +68,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
                  weight_file,batch_size,
                  device_id=None,
                  use_half=False,
+                 use_compression=False,
                  **kwargs):
         """
         Constructor
@@ -94,6 +95,7 @@ class UBMRCNNWorker(MDPyWorkerBase):
         self.batch_size = batch_size
         self._still_processing_msg = False
         self._use_half = use_half
+        self._use_compression = use_compression
         if self._use_half:
             print("Using half of mrcnn not tested")
             assert 1==2
@@ -213,7 +215,10 @@ class UBMRCNNWorker(MDPyWorkerBase):
         for imsg in xrange(self._next_msg_id,nmsgs):
             try:
                 compressed_data = bytes(request[imsg])
-                data = zlib.decompress(compressed_data)
+                if self._use_compression:                
+                    data = zlib.decompress(compressed_data)
+                else:
+                    data = compressed_data
                 c_run = c_int()
                 c_subrun = c_int()
                 c_event = c_int()
@@ -253,6 +258,11 @@ class UBMRCNNWorker(MDPyWorkerBase):
         nimgs = len(img2d_v)
         self._log.debug("converted msgs into batch of {} images. frames={}"
                         .format(nimgs,frames_used))
+
+        if nimgs==0:
+            # send final message: ERROR
+            return ["ERROR:nomessages".encode('utf-8')],True
+
         np_dtype = np.float32
         if self._use_half:
             np_dtype = np.float16
@@ -374,7 +384,10 @@ class UBMRCNNWorker(MDPyWorkerBase):
                 # out_img2d = larcv.as_image2d_meta( out_np.reshape((1008,3456)), meta )
                 bson = larcv.json.as_pybytes( mask,
                                     rseid[0], rseid[1], rseid[2], rseid[3] )
-                compressed = zlib.compress(bson)
+                if self._use_compression:
+                    compressed = zlib.compress(bson)
+                else:
+                    compressed = bson
                 reply.append(compressed)
         if self._next_msg_id>=nmsgs:
             isfinal = True

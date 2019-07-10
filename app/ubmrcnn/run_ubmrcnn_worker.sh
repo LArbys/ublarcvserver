@@ -24,6 +24,7 @@ script=/home/jmills/workdir/ubdl/ublarcvserver/app/ubmrcnn/start_ublarcvserver_u
 # scrpit=start_ublarcvserver_worker.py
 cd $basedir
 logfile=loggpu.log
+
 cmd="python3 ${script} -l ${logfile} -d tcp://10.246.81.72:6000  -m ${devnum} -w ${weightdir} -t  xfer.cluster.tufts.edu  -u jmills09"
 
 $cmd

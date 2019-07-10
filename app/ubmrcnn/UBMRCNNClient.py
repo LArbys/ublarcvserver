@@ -5,6 +5,7 @@ from larcv import larcv
 from ublarcvapp import ublarcvapp
 import zlib
 from ctypes import c_int, byref
+from ROOT import std
 
 #larcv.load_pyutils()
 larcv.json.load_jsonutils()
@@ -18,8 +19,22 @@ class UBMRCNNClient(Client):
                     skip_detsplit=True,
                     opflash_producer="simpleFlashBeam",
                     tick_backwards=False, mrcnn_tree_name="mrcnn",
+                 use_compression=False, use_sparseimg=True,
                     intimewin_min_tick=190, intimewin_max_tick=320,**kwargs):
         """
+        broker_address        [str]   IP address and port of broker. e.g.: tcp://my.server.somwhere:6000
+        larcv_supera_file     [str]   path to LArCV root file with whole images
+        output_larcv_filename [str]   path to LArCV root where we will write output
+        adc_producer          [str]   name of Tree containing input images. e.g. 'wire'
+        skip_detsplit         [bool]  if true, process whole image at once. if false, process crops.
+        opflash_producer      [str]   name of tree carrying opflash information (used to make CROI from flash) (deprecated)
+        tick_backwards        [bool]  if true, expect input LArCV images to be stored in tick-backward format
+        mrcnn_tree_name       [str]   name of output tree contaning MRCN
+        use_compression       [bool]  if false (default), do not compress byte string sent and received
+        use_sparseimg         [bool]  if false (default), do not convert whole image into sparse. otherwisek, do. 
+                                      To save bytes transferred.
+        intime_min_tick       [int]   Start of Time window  for trigger
+        intime_max_tick       [int]   End of Time window  for trigger
         """
         super(UBMRCNNClient,self).__init__(broker_address,**kwargs)
 
@@ -32,6 +47,7 @@ class UBMRCNNClient(Client):
         self._inlarcv.add_in_file(larcv_supera_file)
         self._inlarcv.initialize()
         self.skip_detsplit=skip_detsplit
+        self._use_compression = use_compression
 
         LArliteManager = ublarcvapp.LArliteManager
         self._inlarlite = None
@@ -53,6 +69,9 @@ class UBMRCNNClient(Client):
         self._opflash_producer = opflash_producer
 
         self._ubsplitdet = None
+
+        # MESSAGES TO LOOKFOR
+        self._ERROR_NOMSGS = "ERROR:nomessages".encode('utf-8')
 
     def get_entries(self):
         return self._inlarcv.get_n_entries()
@@ -130,10 +149,17 @@ class UBMRCNNClient(Client):
 
         else:
             print("Planning on Skipping the detsplit. Guess you're working on full images?")
+            thresh_v  = std.vector("float")(1,10.0)
+            require_v = std.vector("int")(1,1)
             for plane in range(nplanes):
-                img2d_v[plane] = [wholeview_v.at(plane)]
+                
+                img = wholeview_v.at(plane)
+                img2d_v[plane] = [img]
 
-
+                # pass sparse representation for effiency
+                #tmp_v = std.vector("larcv::Image2D")()
+                #tmp_v.push_back( img )
+                #img2d_v[plane] = [larcv.SparseImage(tmp_v,thresh_v,require_v)]
 
 
         # send messages
@@ -185,9 +211,14 @@ class UBMRCNNClient(Client):
             for img2d in img2d_list[p]:
                 img_id = nimages_sent # make an id to track if it comes back
                 bson = larcv.json.as_pybytes(img2d,
-                                              run, subrun, event, img_id)
+                                             run, subrun, event, img_id)
+                #bson = larcv.json.as_bson_pybytes(img2d,
+                #                                  run, subrun, event, img_id)
                 nsize_uncompressed += len(bson)
-                compressed = zlib.compress(bson)
+                if self._use_compression:
+                    compressed = zlib.compress(bson)
+                else:
+                    compressed = bson
                 nsize_compressed   += len(compressed)
                 msg.append(compressed)
                 # we make a flag to mark if we got this back
@@ -208,9 +239,17 @@ class UBMRCNNClient(Client):
                 # use the time worker is preparing next part, to convert image
                 print("Number of replies:", len(workerout))
                 for reply in workerout:
+                    if reply==self._ERROR_NOMSGS:
+                        try:
+                            if "ERROR" in reply.decode('utf-8'):
+                                raise RuntimeError("Worker responds with ERROR: {}".format(reply))
+                        except:
+                            print("Could not decode byte object")
+                            pass
                     data = bytes(reply)
                     received_compressed += len(data)
-                    data = zlib.decompress(data)
+                    if self._use_compression:
+                        data = zlib.decompress(data)
                     received_uncompressed += len(data)
                     c_run = c_int()
                     c_subrun = c_int()
