@@ -153,6 +153,8 @@ class MDPyWorkerBase(object):
         """ loops until we get a disconnect signal from the broker.
         Or until an error occurs
         """
+        self._log.info("Starting Worker")
+
         while True:
             client_addr, request = self.wait_for_request()
             if client_addr is None:

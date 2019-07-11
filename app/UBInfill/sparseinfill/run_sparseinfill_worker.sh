@@ -21,7 +21,10 @@ device=`printf cuda:%d ${devnum}`
 logfile=`printf ${logdir}/infill_worker_id%d.log ${SLURM_ARRAY_TASK_ID}`
 script=${INFILL_DIR}/sparseinfill/start_ublarcvserver_sparseinfill_worker.py
 echo ${device}
-cmd="python ${script} -l ${logfile} -brokeraddr ${broker} -m ${device} -w ${weight_dir}"
+
+device=cuda
+export CUDA_VISIBLE_DEVICES=${devnum}
+cmd="python ${script} -l ${logfile} -d -brokeraddr ${broker} -m ${device} -w ${weight_dir}"
 
 echo $cmd
 $cmd

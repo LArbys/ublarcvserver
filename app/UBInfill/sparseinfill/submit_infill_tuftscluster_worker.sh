@@ -7,9 +7,9 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --partition gpu
 #SBATCH --nodelist=pgpu02
-#SBATCH --array=[2-3]
+#SBATCH --array=2
 
-CONTAINER=/cluster/tufts/wongjiradlab/larbys/larbys-containers/singularity_ubdl_051919.img
+CONTAINER=/cluster/tufts/wongjiradlab/larbys/larbys-containers/singularity_ubdl_deps_070119.img
 
 # UBDL_DIR: location of dependencies (e.g. larcv, larlite, ublarcvapp)
 #UBDL_DIR=/cluster/tufts/wongjiradlab/kmason03/testdir/ubdl
