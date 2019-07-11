@@ -33,11 +33,15 @@ source setenv.sh
 
 let line=${SLURM_ARRAY_TASK_ID}+1
 devnum=`sed -n ${line}p ${gpu_list}`
-device=`printf cuda:%d ${devnum}`
+#device=`printf cuda:%d ${devnum}`
+#device="cpu"
+device="cuda"
 echo "SETUP WOKER TO RUN ON DEVICE=${device}"
 script=${ubmrcnn_dir}/start_ublarcvserver_ubmrcnn_worker.py
 
-cmd="python ${script} -l ${log_file} -d -m ${device} -w ${weight_dir} ${broker}"
+export CUDA_VISIBLE_DEVICES=${devnum}
+
+cmd="python ${script} -l ${log_file} -m ${device} -w ${weight_dir} ${broker}"
 
 echo $cmd
 $cmd

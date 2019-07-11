@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-#SBATCH --job-name=ubmrcnn_worker_pgpu03
+#SBATCH --job-name=ubmrcnn_worker_pgpu02
 #SBATCH --output=slurmout_ubmrcnn_worker.log
 #SBATCH --mem-per-cpu=8000
 #SBATCH --time=3-0:00:00
 #SBATCH --cpus-per-task=1
 #SBATCH --partition gpu
-#SBATCH --nodelist=pgpu03
-#SBATCH --array=4
+#SBATCH --nodelist=pgpu02
+#SBATCH --array=2
 
 CONTAINER=/cluster/tufts/wongjiradlab/larbys/larbys-containers/singularity_ubdl_py3_deponly_070119.img
 

@@ -149,9 +149,9 @@ class UBInfillSparseWorker(MDPyWorkerBase):
 
                 imgdata = larcv.json.sparseimg_from_bson_pybytes(data,
                                         c_run, c_subrun, c_event, c_id )
-            except:
+            except Exception as e:
                 self._log.error("Image Data in message part {}\
-                                could not be converted".format(imsg))
+                                could not be converted: {}".format(imsg,str(e)))
                 continue
             self._log.debug("Image[{}] converted: nfeatures={} npts={}"\
                             .format(imsg,imgdata.nfeatures(),
