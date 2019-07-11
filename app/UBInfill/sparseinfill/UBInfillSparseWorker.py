@@ -72,9 +72,6 @@ class UBInfillSparseWorker(MDPyWorkerBase):
             raise ValueError("invalid device name [{}]. Must str with name \
                                 \"cpu\" or \"cuda:X\" where X=device number")
 
-
-        self._log = logging.getLogger(self.idname())
-
         self.device = torch.device(device)
 
         map_location = {"cuda:0":"cpu","cuda:1":"cpu"}
