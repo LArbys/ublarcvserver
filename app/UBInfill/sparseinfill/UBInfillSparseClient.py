@@ -21,6 +21,7 @@ class UBInfillSparseClient(Client):
                  output_larcv_filename,
                  adc_producer="wire", chstatus_producer="wire",
                  tick_backwards=False, infill_tree_name="infill",
+                 save_adc_image=False,
                  use_compression=False,
                  **kwargs):
         """
@@ -48,6 +49,7 @@ class UBInfillSparseClient(Client):
 
         self._ubsplitdet = None
         self._use_compression = use_compression
+        self._save_adc_image = save_adc_image
 
     def get_entries(self):
         return self._inlarcv.get_n_entries()
@@ -350,9 +352,12 @@ class UBInfillSparseClient(Client):
         ev_infill = self._outlarcv.\
                         get_data(larcv.kProductImage2D,
                                  self._infill_tree_name)
-        ev_input = self._outlarcv.\
-                        get_data(larcv.kProductImage2D,
-                                self._adc_producer)
+
+        if self._save_adc_image:
+            # save a copy of input image
+            ev_input = self._outlarcv.\
+                get_data(larcv.kProductImage2D,
+                         self._adc_producer)
 
         for p in xrange(nplanes):
 
@@ -379,7 +384,8 @@ class UBInfillSparseClient(Client):
                                             overlapcountimg, wholeview_v, ev_chstatus)
 
             ev_infill.Append(outputimg)
-            ev_input.Append(wholeview_v.at(p))
+            if self._save_adc_image:
+                ev_input.Append(wholeview_v.at(p))
 
     def process_entries(self,start=0, end=-1):
         if end<0:
