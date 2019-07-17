@@ -102,9 +102,10 @@ class UBInfillSparseClient(Client):
         FillCroppedYImageCompletely: true
         DebugImage: false
         MaxImages: -1
+        RandomizeCrops: 0
         MaxRandomAttempts: 4
         MinFracPixelsInCrop: -0.0001
-        TickForward: false
+        TickForward: true
         """
 
         fcfg = open("ubsplit.cfg",'w')
