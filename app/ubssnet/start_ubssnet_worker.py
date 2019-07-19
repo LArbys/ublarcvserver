@@ -10,13 +10,13 @@ Start the broker and worker. Run one client. Useful for tests.
 def start_ubssnet_worker(broker_address,plane,weight_file,
                          device,batch_size,
                          ssh_thru_server,ssh_password):
-    print batch_size,type(batch_size)
+    print(batch_size,type(batch_size))
     worker=UBSSNetWorker(broker_address,plane,weight_file,
                          device,batch_size,
                          ssh_thru_server=ssh_thru_server,
                          ssh_password=ssh_password)
     worker.connect()
-    print "worker started: ",worker.idname()
+    print("worker started: ",worker.idname())
     worker.run()
 
 
@@ -35,8 +35,8 @@ def startup_ubssnet_workers( broker_address, weights_files,
 
     # setup the worker
     pworkers = []
-    print "plans: ",nplanes
-    print "devices: ",devices
+    print("plans: ",nplanes)
+    print("devices: ",devices)
     for p,device in zip(nplanes,devices):
         pworker = Process(target=start_ubssnet_worker,
                           args=(broker_address,p,weights_files[p],
@@ -70,5 +70,5 @@ if __name__ == "__main__":
     pbroker = start_broker(bindpoint)
     pworkers = startup_ubssnet_workers(endpoint,weights_files,nplanes=[0,1,2])
 
-    print "[ENTER] to quit."
+    print("[ENTER] to quit.")
     raw_input()

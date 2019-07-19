@@ -78,7 +78,7 @@ class UBSSNetClient(Client):
         run    = self._inlarcv.event_id().run()
         subrun = self._inlarcv.event_id().subrun()
         event  = self._inlarcv.event_id().event()
-        print "num of planes in entry {}: ".format((run,subrun,event)),nplanes
+        print("num of planes in entry {}: ".format((run,subrun,event)),nplanes)
 
         # define the roi_v images
         roi_v = []
@@ -99,7 +99,7 @@ class UBSSNetClient(Client):
                 for iroi in xrange(flashrois.size()):
                     roi_v.append( flashrois.at(iroi) )
                 nintime_flash += 1
-            print "number of intime flashes: ",nintime_flash
+            print("number of intime flashes: ",nintime_flash)
         else:
             # we split the entire image
             raise RuntimeError("Use of ubsplitdet for image not implemented")
@@ -125,9 +125,9 @@ class UBSSNetClient(Client):
 
         planes = img2d_v.keys()
         planes.sort()
-        print "Number of images on each plane:"
+        print("Number of images on each plane:")
         for plane in planes:
-            print "plane[{}]: {}".format(plane,len(img2d_v[plane]))
+            print("plane[{}]: {}".format(plane,len(img2d_v[plane])))
 
         # send messages
         replies = self.send_image_list(img2d_v,run=run,subrun=subrun,event=event)
@@ -170,7 +170,7 @@ class UBSSNetClient(Client):
             msg = []
             for img2d in img2d_list[p]:
                 img_id = nimages_sent # make an id to track if it comes back
-                bson = larcv.json.as_pystring(img2d,
+                bson = larcv.json.as_pybytes(img2d,
                                               run, subrun, event, img_id)
                 nsize_uncompressed += len(bson)
                 compressed = zlib.compress(bson)

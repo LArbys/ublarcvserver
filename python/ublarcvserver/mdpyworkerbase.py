@@ -1,6 +1,6 @@
 import zmq
 import time, abc, logging
-import majortomo.protocol as p
+from .majortomo import protocol as p
 from zmq import ssh
 
 class MDPyWorkerBase(object):
@@ -12,7 +12,7 @@ class MDPyWorkerBase(object):
     def __init__(self, service_name, broker_address,
                     zmq_context=None, id_name=None, verbose=False,
                     heartbeat_interval_secs=2.5,
-                    heartbeat_timeout_secs=60.0,
+                    heartbeat_timeout_secs=120.0,
                     ssh_thru_server=None, ssh_password=None ):
         self._broker_address = broker_address
         self._service_name   = service_name.encode('ascii')
@@ -28,7 +28,7 @@ class MDPyWorkerBase(object):
         self._ssh_password = ssh_password # this is terrible
 
         # set the zmq context
-        print "zmq_context:",zmq_context
+        print("zmq_context:",zmq_context)
         self._context = zmq_context if zmq_context else zmq.Context()
 
         self._socket = None  # type: zmq.Socket
@@ -153,6 +153,8 @@ class MDPyWorkerBase(object):
         """ loops until we get a disconnect signal from the broker.
         Or until an error occurs
         """
+        self._log.info("Starting Worker")
+
         while True:
             client_addr, request = self.wait_for_request()
             if client_addr is None:
@@ -247,6 +249,7 @@ class MDPyWorkerBase(object):
                 socks = dict(self._poller.poll(timeout=poll_timeout))
             except zmq.error.ZMQError:
                 # Probably connection was explicitly closed
+                print("poll zmqError")
                 if self._socket is None:
                     continue
                 raise
@@ -255,7 +258,7 @@ class MDPyWorkerBase(object):
                 message = self._socket.recv_multipart()
                 self._log.debug("Got message of %d frames", len(message))
             else:
-                self._log.debug("Receive timed out after %d ms", poll_timeout)
+                self._log.debug("Poll to receive timed out after %d ms", poll_timeout)
                 if (time.time()-self._last_broker_hb)>self._heartbeat_timeout:
                     # We're not connected anymore?
                     self._log.info("Got no heartbeat in %d sec, \
