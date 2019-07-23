@@ -8,4 +8,5 @@ from .mdpyworkerbase import MDPyWorkerBase as MDPyWorkerBase
 from .DummyPyWorker import DummyPyWorker as DummyPyWorker
 from .majortomo.broker import Broker as Broker
 from .majortomo.client import Client as Client
+from .majortomo.error import *
 from .start_broker import start_broker
