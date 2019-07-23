@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --partition gpu
 #SBATCH --nodelist=pgpu02
-#SBATCH --array=1-3
+#SBATCH --array=0-3
 
 CONTAINER=/cluster/tufts/wongjiradlab/larbys/larbys-containers/singularity_ubdl_deps_070119.img
 
@@ -35,7 +35,7 @@ BROKER=nudot.lns.mit.edu
 PORT=6000
 
 # GPU LIST
-GPU_ASSIGNMENTS=${WORKDIR}/tufts_pgpu03_assignments.txt
+GPU_ASSIGNMENTS=${WORKDIR}/tufts_pgpu02_assignments.txt
 
 COMMAND="source ${WORKDIR}/run_dense_larflow_worker.sh tcp://${BROKER}:${PORT} ${UBLARFLOW_DIR} ${UBDL_DIR} ${WEIGHT_DIR} ${GPU_ASSIGNMENTS} ${WORKER_LOGDIR}"
 

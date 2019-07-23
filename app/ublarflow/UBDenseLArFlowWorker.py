@@ -50,6 +50,13 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
             self._log.info("Loaded UBDenseLArFlowWorker model. Service={}"\
                             .format(service_name))
 
+            # run batch to reserve memory while we have a chance
+            import torch
+            src_tmp = torch.zeros( (self.batch_size,1,512,832) ).to(self.device)
+            tar_tmp = torch.zeros( (self.batch_size,1,512,832) ).to(self.device)
+            with torch.set_grad_enabled(False):
+                flowout, visiout = self.model( src_tmp, tar_tmp )
+
     def load_model(self,weight_file,device,use_half):
         """
         weight_file [str] path to weights
@@ -60,7 +67,6 @@ class UBDenseLArFlowWorker(MDPyWorkerBase):
         # import pytorch
         try:
             import torch
-            import sparseconvnet as scn
         except:
             raise RuntimeError("could not load pytorch!")
 

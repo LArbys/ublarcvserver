@@ -1,6 +1,7 @@
 from __future__ import print_function
 import logging, time
 from ublarcvserver import Client
+from ublarcvserver import Timeout
 from larlite import larlite
 from larcv import larcv
 from ublarcvapp import ublarcvapp
@@ -22,6 +23,7 @@ class UBDenseLArFlowClient(Client):
                  save_cropped_adc=False,
                  flow_dirs=["y2u","y2v"],
                  plane_scale_factors=[1.0,1.0,1.0],
+                 receive_timeout_secs=300,
                  **kwargs):
         """
         this class loads either larcv::sparseimage or larcv::image2d data from
@@ -83,6 +85,7 @@ class UBDenseLArFlowClient(Client):
         self._split_algo.set_verbosity(2)
 
         self.flow_dirs = flow_dirs
+        self._timeout_secs = receive_timeout_secs
 
         # we do not stitch, but store individual crops
         # the post-processor does the stitching
@@ -244,58 +247,73 @@ class UBDenseLArFlowClient(Client):
         imgout_v = {"y2u":{},"y2v":{}}
         received_compressed = 0
         received_uncompressed = 0
-        complete = True
+
         for flowdir in self.flow_dirs:
 
             service_name = "ublarflow_dense_%s"%(flowdir)
-            print("Send messages to service={}".format(service_name))
-            self.send(service_name,*msg[flowdir])
 
-            # receive this flow result
-            isfinal = False
-            while not isfinal:
-                workerout = self.recv_part()
-                isfinal =  workerout is None
-                if isfinal:
-                    self._log.debug("received DONE indicator by worker")
-                    break
-                self._log.debug("num frames received from worker: {}"
-                                .format(len(workerout)))
-                # use the time worker is preparing next part, to convert image
-                for reply in workerout:
-                    data = str(reply)
-                    received_compressed += len(data)
-                    data = zlib.decompress(data)
-                    received_uncompressed += len(data)
-                    c_run = c_int()
-                    c_subrun = c_int()
-                    c_event = c_int()
-                    c_id = c_int()
-                    replyimg = larcv.json.sparseimg_from_bson_pybytes(data,
-                                c_run, c_subrun, c_event, c_id ).as_Image2D()
-                    #byref(c_run),byref(c_subrun),byref(c_event),byref(c_id))
-                    rep_rse = (c_run.value,c_subrun.value,c_event.value)
-                    self._log.debug("rec images with rse={}".format(rep_rse))
-                    if rep_rse!=rse:
-                        self._log.warning("image with wronge rse={}. ignoring."
-                                            .format(rep_rse))
-                        continue
+            nattempts = 0
+            flow_complete = False
+            while nattempts<=3 and not flow_complete:
+                nattempts += 1
 
-                    imgout_v[flowdir][int(c_id.value)] = replyimg
-                    got_reply[flowdir][int(c_id.value)] += 1
-                    self._log.debug("running total, converted images: {}"
-                                    .format(len(imgout_v[flowdir])))
+                print("Send messages to service={}".format(service_name))
+                self.send(service_name,*msg[flowdir])
 
-            # check completeness of this flow
-            for imgid,nreplies in got_reply[flowdir].items():
-                if nreplies!=1:
-                    self._log.debug("imgid[{}] not complete. nreplies={}".format(imgid,nreplies))
-                    complete = False
-            self._log.debug("is {} compelete: {}".format(flowdir,complete))
+                # receive this flow result
+                isfinal = False
+                while not isfinal:
+                    try:
+                        workerout = self.recv_part(timeout=self._timeout_secs)
+                    except Timeout:
+                        print("Exception occurred while waiting for reply: timeout={} istimeout=".format(self._timeout_secs),e is Timeout)
+                        workerout = None
+                        break
+                    except:
+                        print("Error in waiting for reply")
 
-        # should have got all images back
-        if not complete:
-            raise RuntimeError("Did not receive complete set for all images")
+                    isfinal =  workerout is None
+                    if isfinal:
+                        self._log.debug("received DONE indicator by worker")
+                        break
+                    self._log.debug("num frames received from worker: {}"
+                                    .format(len(workerout)))
+                    # use the time worker is preparing next part, to convert image
+                    for reply in workerout:
+                        data = str(reply)
+                        received_compressed += len(data)
+                        data = zlib.decompress(data)
+                        received_uncompressed += len(data)
+                        c_run = c_int()
+                        c_subrun = c_int()
+                        c_event = c_int()
+                        c_id = c_int()
+                        replyimg = larcv.json.sparseimg_from_bson_pybytes(data,
+                                                                          c_run, c_subrun, c_event, c_id ).as_Image2D()
+                        rep_rse = (c_run.value,c_subrun.value,c_event.value)
+                        self._log.debug("rec images with rse={}".format(rep_rse))
+                        if rep_rse!=rse:
+                            self._log.warning("image with wronge rse={}. ignoring."
+                                              .format(rep_rse))
+                            continue
+
+                        imgout_v[flowdir][int(c_id.value)] = replyimg
+                        got_reply[flowdir][int(c_id.value)] += 1
+                        self._log.debug("running total, converted images: {}"
+                                        .format(len(imgout_v[flowdir])))
+
+                # check completeness of this flow
+                flow_complete = True
+                for imgid,nreplies in got_reply[flowdir].items():
+                    if nreplies!=1:
+                        self._log.debug("imgid[{}] not complete. nreplies={}".format(imgid,nreplies))
+                        flow_complete = False
+                self._log.debug("is {} compelete: {}".format(flowdir,flow_complete))
+                
+            if not flow_complete:
+                self._log.debug("could not complete after 3 attempts. stop.")
+                raise RuntimeError("Could not assemble complete replies after 3 attempts.")
+
 
         self._log.debug("Total sent size. uncompressed=%.2f MB compreseed=%.2f"\
                         %(nsize_uncompressed/1.0e6,nsize_compressed/1.0e6))

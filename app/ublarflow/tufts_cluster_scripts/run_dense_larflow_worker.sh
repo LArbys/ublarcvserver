@@ -46,7 +46,7 @@ script=${larflow_dir}/./start_dense_ublarflow_worker.py
 export CUDA_VISIBLE_DEVICES=${devnum}
 
 #cmd="CUDA_VISIBLE_DEVICES=${devnum} ${script} -l ${log_file} -d -m ${device} -w ${weight_dir} ${broker}"
-cmd="${script} -l ${log_file} -d -m ${device} -b 4 -w ${weight_dir} ${broker}"
+cmd="${script} -l ${log_file} -d -m ${device} -b 2 -w ${weight_dir} ${broker}"
 
 echo $cmd
 $cmd
