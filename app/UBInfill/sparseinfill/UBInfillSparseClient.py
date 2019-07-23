@@ -266,7 +266,7 @@ class UBInfillSparseClient(Client):
             # receives
             isfinal = False
             while not isfinal:
-                workerout = self.recv_part()
+                workerout = self.recv_part(timeout=300) # 5 minute wait
                 isfinal =  workerout is None
                 if isfinal:
                     self._log.info("received done indicator by worker")
