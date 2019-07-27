@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # location of this script
-where="$( cd "$( dirname "${PWD}/${BASH_SOURCE[0]}" )" && pwd )"
+where="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # add model folder to python path
 export UBMRCNN_SERVERAPP_DIR=$where
