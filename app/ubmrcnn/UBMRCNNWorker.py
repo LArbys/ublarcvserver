@@ -21,10 +21,6 @@ import subprocess
 from collections import defaultdict
 from six.moves import xrange
 
-# Use a non-interactive backend
-import matplotlib
-matplotlib.use('Agg')
-
 import numpy as np
 try:
     import cv2
