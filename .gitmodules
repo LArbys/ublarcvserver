@@ -4,3 +4,6 @@
 [submodule "networks/Detectron.pytorch"]
 	path = networks/mask-rcnn.pytorch
 	url = https://github.com/NuTufts/Detectron.pytorch.git
+[submodule "networks/sparse_ssnet"]
+	path = networks/sparse_ssnet
+	url = https://github.com/NuTufts/uresnet_pytorch.git
