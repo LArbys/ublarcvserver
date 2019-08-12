@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     client = SparseSSNetClient(args.brokeraddr,args.input,args.output,
                                adc_producer=args.adc,
-                               input_mode=SparseSSNetClient.SPLIT,
+                               input_mode=SparseSSNetClient.WHOLE,
                                tick_backwards=args.tick )
     client.connect()
 
