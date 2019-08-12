@@ -208,6 +208,7 @@ class SparseSSNetWorker(MDPyWorkerBase):
             spimg_np = larcv.as_ndarray( img2d, larcv.msg.kNORMAL )
             print("spimg_np shape: {}".format( spimg_np.shape ))
             print("batch_np[startidx:endidx,0:3] shape: {}".format(batch_np[startidx:endidx,0:3].shape))
+            #print("spimg_np: {}".format(spimg_np[:,0:2]))
             batch_np[startidx:endidx,0:3] = spimg_np[:,:]
             batch_np[startidx:endidx,3]   = idx
             idx += 1
@@ -223,13 +224,17 @@ class SparseSSNetWorker(MDPyWorkerBase):
         startidx = 0
         for idx in xrange(len(results['softmax'])):
             ssnetout_np = results['softmax'][idx]
+            print("ssneout_np: {}".format(ssnetout_np.shape))
             rseid = rseid_v[idx]
             meta  = img2d_v[idx].meta(0)
             npts  = int( npts_v[idx] )
             endidx = startidx+npts
-            ssnetout_wcoords = np.zeros( (ssnetout_np.shape[0],ssnetout_np.shape[1]+2) )
-            ssnetout_wcoords[:,0:2] = data_blob['data'][0][0][startidx:endidx,0:2]
+            print("numpoints for img[{}]: {}".format(idx,npts))
+            ssnetout_wcoords = np.zeros( (ssnetout_np.shape[0],ssnetout_np.shape[1]+2), dtype=np.float32 )
+            ssnetout_wcoords[:,0:2] = batch_np[startidx:endidx,0:2]
             ssnetout_wcoords[:,2:2+ssnetout_np.shape[1]] = ssnetout_np[:,:]
+            startidx = endidx
+            print("ssnetout_wcoords: {}".format(ssnetout_wcoords[:,0:2]))
 
             meta_v = std.vector("larcv::ImageMeta")()
             for i in xrange(5):

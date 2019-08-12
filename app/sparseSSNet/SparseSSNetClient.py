@@ -70,9 +70,9 @@ class SparseSSNetClient(Client):
         self._log = logging.getLogger(__name__)
 
         #FixedCROIFromFlash = ublarcvapp.ubdllee.FixedCROIFromFlashAlgo
-        self._sparseout_tree_name  = sparseout_tree_name
-        self._adc_producer         = adc_producer
-        self._opflash_producer     = opflash_producer
+        self._sparseout_tree_name = sparseout_tree_name
+        self._adc_producer        = adc_producer
+        self._opflash_producer    = opflash_producer
 
         self._ubsplitdet = None
 
@@ -315,41 +315,83 @@ class SparseSSNetClient(Client):
                         %(received_compressed/1.0e6, received_uncompressed/1.0e6))
         return masks_v
 
-    def process_received_images(self, wholeview_v, out_masks_vv):
-        """ receive the list of images from the worker """
+    def process_received_images(self, wholeview_v, replies_vv):
+        """ receive the list of images from the worker 
+        we create a track and shower image. 
+        we also save the raw 5-class sparse image as well: HIP MIP SHOWER DELTA MICHEL
+        """
 
-        if True:
-            return
-        
         nplanes = wholeview_v.size()
-        # nplanes = 1
-        # print("FORCING NPLANES=1")
-        print(larcv.kProductClusterMask, type(larcv.kProductClusterMask))
-        print(self._mrcnn_tree_name+"_masks", "{{type:", type(self._mrcnn_tree_name+"_masks"))
-        ev_clustermasks = self._outlarcv.\
-                        get_data(larcv.kProductClusterMask,
-                                 self._mrcnn_tree_name+"_masks")
-        print(len(ev_clustermasks.as_vector()))
-        if len(ev_clustermasks.as_vector()) > 0:
-            print(len(ev_clustermasks.as_vector()[0]))
 
-        masks_vv = ev_clustermasks.as_vector()
-        masks_vv.resize(nplanes)
-        print("Survival?")
-        # ev_track  = self._outlarcv.\
-        #                 get_data(larcv.kProductImage2D,
-        #                          self._mrcnn_tree_name+"_track")
-        #ev_bg     = self._outlarcv.\
-        #                get_data(larcv.kProductImage2D,"mrcnn_background")
+        # save the sparse image data
+        for p in xrange(nplanes):
+            ev_sparse_output = self._outlarcv.get_data(larcv.kProductSparseImage,
+                                                       "{}_plane{}".format(self._sparseout_tree_name,p) )
 
-        for p in range(nplanes):
-            nmasks = int(len(out_masks_vv[p]))
-            for mask in range(nmasks):
-                print("Are we seeing probs?", out_masks_vv[p][mask].probability_of_class)
-                masks_vv.at(p).push_back(out_masks_vv[p][mask])
-        print(len(ev_clustermasks.as_vector()))
-        if len(ev_clustermasks.as_vector()) > 0:
-            print(len(ev_clustermasks.as_vector()[0]))
+            replies_v = replies_vv[p]
+
+            for reply in replies_v:
+                ev_sparse_output.Append( reply )
+
+            self._log.info("Saving {} sparse images for plane {}".format(ev_sparse_output.SparseImageArray().size(),p))
+
+        # make the track/shower images
+        ev_shower = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_shower" )
+        ev_track  = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_track" )
+        ev_bg     = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_background" )        
+        shower_v  = std.vector("larcv::Image2D")()
+        track_v   = std.vector("larcv::Image2D")()
+        bground_v = std.vector("larcv::Image2D")()
+
+        for p in xrange(wholeview_v.size()):
+            img = wholeview_v.at(p)
+
+            showerimg = larcv.Image2D(img.meta())
+            showerimg.paint(0.0)
+            shower_v.push_back( showerimg )
+
+            trackimg  = larcv.Image2D(img.meta())
+            trackimg.paint(0.0)
+            track_v.push_back( trackimg )
+
+            bgimg  = larcv.Image2D(img.meta())
+            bgimg.paint(0.0)
+            bground_v.push_back( bgimg )
+            
+        for p in xrange(wholeview_v.size()):
+
+            showerimg = shower_v.at(p)
+            trackimg  = track_v.at(p)
+            bgimg     = bground_v.at(p)
+            
+            for sparseout in replies_vv[p]:
+                npts = int( sparseout.pixellist().size()/(sparseout.nfeatures()+2) )
+                #print("num points: {}".format(npts))
+                #print("num features: {}".format(sparseout.nfeatures()+2))
+                stride = int( sparseout.nfeatures()+2 )
+                for ipt in xrange(npts):
+                    row = int(sparseout.pixellist().at( stride*ipt+0 ))
+                    col = int(sparseout.pixellist().at( stride*ipt+1 ))
+                    
+                    hip = sparseout.pixellist().at( stride*ipt+2 )
+                    mip = sparseout.pixellist().at( stride*ipt+3 )
+                    shr = sparseout.pixellist().at( stride*ipt+4 )
+                    dlt = sparseout.pixellist().at( stride*ipt+5 )
+                    mic = sparseout.pixellist().at( stride*ipt+6 )
+
+                    bg  = 1-(hip+mip+shr+dlt+mic)
+                    totshr = shr+dlt+mic
+                    tottrk = hip+mip
+
+                    showerimg.set_pixel( row, col, totshr )
+                    trackimg.set_pixel(  row, col, tottrk )
+                    bgimg.set_pixel(     row, col, bg )
+                    
+            ev_shower.Append( showerimg )
+            ev_track.Append(  trackimg )
+            ev_bg.Append( bgimg )
+
+        
 
 
 
