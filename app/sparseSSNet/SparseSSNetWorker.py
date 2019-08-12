@@ -209,8 +209,12 @@ class SparseSSNetWorker(MDPyWorkerBase):
             print("spimg_np shape: {}".format( spimg_np.shape ))
             print("batch_np[startidx:endidx,0:3] shape: {}".format(batch_np[startidx:endidx,0:3].shape))
             #print("spimg_np: {}".format(spimg_np[:,0:2]))
-            batch_np[startidx:endidx,0:3] = spimg_np[:,:]
+            #batch_np[startidx:endidx,0:3] = spimg_np[:,:]
+            batch_np[startidx:endidx,0] = spimg_np[:,1]
+            batch_np[startidx:endidx,1] = spimg_np[:,0]
+            batch_np[startidx:endidx,2] = spimg_np[:,2]                        
             batch_np[startidx:endidx,3]   = idx
+            print("batch_np: {}".format(batch_np[:,0:2]))
             idx += 1
 
         # pass to network

@@ -114,8 +114,35 @@ class SparseSSNetClient(Client):
         roi_v = []
         
         if self._input_mode == SparseSSNetClient.SPLIT:
+            
             # we split the entire image
-            raise RuntimeError("Use of ubsplitdet for image not implemented")
+            # hack with numpy for now
+
+            img_np = []
+            for p in xrange(wholeview_v.size()):
+                img   = wholeview_v.at(p)
+                meta  = img.meta()
+                imgnp = larcv.as_ndarray(img)
+                print("whole np shape: {}".format(imgnp.shape))
+                nsplits_wire = int(imgnp.shape[0]/512)                
+                nsplits_tick = int(imgnp.shape[1]/512)
+                print("nsplits_wire={} nsplits_tick={}".format(nsplits_wire,nsplits_tick))
+                for itick in xrange(nsplits_tick):
+                    for iwire in xrange(nsplits_wire):
+                        splitnp = imgnp[iwire*512:(iwire+1)*512,itick*512:(itick+1)*512]
+                        print("splitnp: {}".format(splitnp.shape))
+
+                        # redefine meta
+                        splitmeta = larcv.ImageMeta( 512*meta.pixel_width(), 512*meta.pixel_height(),
+                                                     512, 512,
+                                                     meta.min_x()+512*meta.pixel_width()*iwire,
+                                                     meta.min_y()+512*meta.pixel_height()*itick,
+                                                     meta.plane() )
+
+                        print("{} {}: {}".format( (itick,iwire), (splitmeta.cols(),splitmeta.rows()), splitmeta.dump()) )
+                        splitimg = larcv.as_image2d_meta( splitnp, splitmeta )
+                        img2d_v[p].append(splitimg)
+                
 
         elif self._input_mode == SparseSSNetClient.OPFLASH_ROI:
             # use the intime flash to look for a CROI
@@ -363,15 +390,20 @@ class SparseSSNetClient(Client):
             showerimg = shower_v.at(p)
             trackimg  = track_v.at(p)
             bgimg     = bground_v.at(p)
+
+            wholemeta = wholeview_v.at(p).meta()
             
             for sparseout in replies_vv[p]:
                 npts = int( sparseout.pixellist().size()/(sparseout.nfeatures()+2) )
                 #print("num points: {}".format(npts))
                 #print("num features: {}".format(sparseout.nfeatures()+2))
                 stride = int( sparseout.nfeatures()+2 )
+                sparse_meta = sparseout.meta(0)
+                
                 for ipt in xrange(npts):
-                    row = int(sparseout.pixellist().at( stride*ipt+0 ))
-                    col = int(sparseout.pixellist().at( stride*ipt+1 ))
+                    
+                    row = int(sparseout.pixellist().at( stride*ipt+1 ))
+                    col = int(sparseout.pixellist().at( stride*ipt+0 ))
                     
                     hip = sparseout.pixellist().at( stride*ipt+2 )
                     mip = sparseout.pixellist().at( stride*ipt+3 )
@@ -383,9 +415,18 @@ class SparseSSNetClient(Client):
                     totshr = shr+dlt+mic
                     tottrk = hip+mip
 
-                    showerimg.set_pixel( row, col, totshr )
-                    trackimg.set_pixel(  row, col, tottrk )
-                    bgimg.set_pixel(     row, col, bg )
+                    # translate to different meta
+                    try:
+                        xrow = wholemeta.row( sparse_meta.pos_y(row) )
+                        xcol = wholemeta.col( sparse_meta.pos_x(col) )
+
+                        showerimg.set_pixel( xrow, xcol, totshr )
+                        trackimg.set_pixel(  xrow, xcol, tottrk )
+                        bgimg.set_pixel(     xrow, xcol, bg )
+                    except:
+                        print("error assigning {} -- {} to wholeview. meta={}".format( (col,row),
+                                                                                       (sparse_meta.pos_x(col), sparse_meta.pos_y(row)),
+                                                                                       sparse_meta.dump() ) )
                     
             ev_shower.Append( showerimg )
             ev_track.Append(  trackimg )
