@@ -1,3 +1,5 @@
+from __future__ import print_function
+import os,sys
 import logging
 from ublarcvserver import Client
 from larlite import larlite
@@ -21,6 +23,7 @@ class SparseSSNetClient(Client):
                  output_larcv_filename,
                  adc_producer="wire",
                  input_mode=0,
+                 cropper_cfg=None,
                  larlite_opreco_file=None, opflash_producer="simpleFlashBeam",
                  tick_backwards=False,    sparseout_tree_name="uresnet",
                  use_compression=False,   use_sparseimg=True,
@@ -47,13 +50,65 @@ class SparseSSNetClient(Client):
         tick_direction = larcv.IOManager.kTickForward
         if tick_backwards:
             tick_direction = larcv.IOManager.kTickBackward
-        self._inlarcv = larcv.IOManager(larcv.IOManager.kREAD,"",tick_direction)
-                                        
-        self._inlarcv.add_in_file(larcv_supera_file)
-        self._inlarcv.initialize()
-        self._input_mode = input_mode
-        self._use_compression = use_compression
 
+        self._input_mode      = input_mode
+        self._use_compression = use_compression
+        self._cropper_cfg     = cropper_cfg
+
+        if self._input_mode == SparseSSNetClient.SPLIT:
+            # SPLIT WHOLEVIEW IMAGE
+
+            if cropper_cfg==None:
+                # create config
+                default_cfg="""ProcessDriver: {
+  Verbosity: 0
+  RandomAccess: false
+  EnableFilter: false
+  InputFiles: [""]
+  IOManager: {
+    IOMode: 2
+    Name: "larflowinput"
+    OutFileName: "tmp_out.root"
+  }
+  ProcessName: ["ubsplit"]
+  ProcessType: ["UBSplitDetector"]
+
+  ProcessList: {
+    ubsplit: {
+      Verbosity: 0
+      InputProducer:\"%s\"
+      OutputBBox2DProducer: \"detsplit\"
+      CropInModule: true
+      OutputCroppedProducer: \"detsplit\"
+      BBoxPixelHeight: 512
+      BBoxPixelWidth:  832
+      CoveredZWidth: 310
+      FillCroppedYImageCompletely: true
+      DebugImage: false
+      MaxImageS: -1
+      RandomizeCrops: false
+      MaxRandomAttempts: 1
+      MinFracPixelsInCrop: 0.0
+   }
+ }
+}
+"""%( adc_producer )
+                print(default_cfg,file=open("default_ubsplit.cfg",'w'))
+                cropper_cfg = "default_ubsplit.cfg"
+            
+            self._splitter = larcv.ProcessDriver( "ProcessDriver" )
+            self._splitter.configure( cropper_cfg )
+            infiles = std.vector("std::string")()
+            infiles.push_back( larcv_supera_file )
+            self._splitter.override_input_file(infiles)
+            self._splitter.initialize()
+            self._inlarcv = self._splitter.io_mutable()
+        else:
+            self._inlarcv = larcv.IOManager(larcv.IOManager.kREAD,"",tick_direction)
+            self._inlarcv.add_in_file(larcv_supera_file)
+            self._inlarcv.initialize()
+
+        # LARLITE INPUT (used when cropping based on OPFLASH)
         self._inlarlite = None
         if self._input_mode == SparseSSNetClient.OPFLASH_ROI:
             if larlite_opreco_file is None or os.path.exists(larlite_opreco_file):
@@ -110,44 +165,30 @@ class SparseSSNetClient(Client):
             if plane not in img2d_v:
                 img2d_v[plane] = []
 
-        # for if we split
-        roi_v = []
-        
         if self._input_mode == SparseSSNetClient.SPLIT:
             
             # we split the entire image
             # hack with numpy for now
 
-            img_np = []
-            for p in xrange(wholeview_v.size()):
-                img   = wholeview_v.at(p)
-                meta  = img.meta()
-                imgnp = larcv.as_ndarray(img)
-                #print("whole np shape: {}".format(imgnp.shape))
-                nsplits_wire = int(imgnp.shape[0]/512)                
-                nsplits_tick = int(imgnp.shape[1]/512)
-                #print("nsplits_wire={} nsplits_tick={}".format(nsplits_wire,nsplits_tick))
-                for itick in xrange(nsplits_tick):
-                    for iwire in xrange(nsplits_wire):
-                        splitnp = imgnp[iwire*512:(iwire+1)*512,itick*512:(itick+1)*512]
-                        #print("splitnp: {}".format(splitnp.shape))
+            self._splitter.process_entry( int(entry_num), False, False )
+            ev_cropped = self._splitter.io_mutable().get_data(larcv.kProductImage2D, "detsplit")
+            cropped_v = ev_cropped.Image2DArray()
+            self._log.debug("cropped wholeview image into {} crop sets (total: {})".format(cropped_v.size()/3,cropped_v.size()))
 
-                        # redefine meta
-                        splitmeta = larcv.ImageMeta( 512*meta.pixel_width(), 512*meta.pixel_height(),
-                                                     512, 512,
-                                                     meta.min_x()+512*meta.pixel_width()*iwire,
-                                                     meta.min_y()+512*meta.pixel_height()*itick,
-                                                     meta.plane() )
-
-                        #print("{} {}: {}".format( (itick,iwire), (splitmeta.cols(),splitmeta.rows()), splitmeta.dump()) )
-                        splitimg = larcv.as_image2d_meta( splitnp, splitmeta )
-                        img2d_v[p].append(splitimg)
+            nsets = cropped_v.size()/3
+            for iset in xrange(nsets):
+                for p in xrange(3):
+                    img = cropped_v.at( 3*iset+p )
+                    img2d_v[p].append(img)
                 
 
         elif self._input_mode == SparseSSNetClient.OPFLASH_ROI:
             # use the intime flash to look for a CROI
             # note, need to get data from larcv first else won't sync properly
             # this is weird behavior by larcv that I need to fix
+
+            roi_v = []
+
             self._inlarlite.syncEntry(self._inlarcv)
             ev_opflash = self._inlarlite.get_data(larlite.data.kOpFlash,
                                                   self._opflash_producer)
@@ -359,29 +400,33 @@ class SparseSSNetClient(Client):
             self._log.info("Saving {} sparse images for plane {}".format(ev_sparse_output.SparseImageArray().size(),p))
 
         # make the track/shower images
-        ev_shower = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_shower" )
-        ev_track  = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_track" )
-        ev_bg     = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_background" )
+        #ev_shower = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_shower" )
+        #ev_track  = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_track" )
+        #ev_bg     = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_background" )
         ev_pred   = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_prediction" )
-        shower_v  = std.vector("larcv::Image2D")()
-        track_v   = std.vector("larcv::Image2D")()
-        bground_v = std.vector("larcv::Image2D")()
+
+        # in order to seemlessly work with vertexer        
+        ev_uburn = [ self._outlarcv.get_data(larcv.kProductImage2D, "uburn_plane{}".format(p) ) for p in xrange(3) ]
+        
+        #shower_v  = std.vector("larcv::Image2D")()
+        #track_v   = std.vector("larcv::Image2D")()
+        #bground_v = std.vector("larcv::Image2D")()
         pred_v    = std.vector("larcv::Image2D")()
 
         for p in xrange(wholeview_v.size()):
             img = wholeview_v.at(p)
+            
+            #showerimg = larcv.Image2D(img.meta())
+            #showerimg.paint(0.0)
+            #shower_v.push_back( showerimg )
 
-            showerimg = larcv.Image2D(img.meta())
-            showerimg.paint(0.0)
-            shower_v.push_back( showerimg )
+            #trackimg  = larcv.Image2D(img.meta())
+            #trackimg.paint(0.0)
+            #track_v.push_back( trackimg )
 
-            trackimg  = larcv.Image2D(img.meta())
-            trackimg.paint(0.0)
-            track_v.push_back( trackimg )
-
-            bgimg  = larcv.Image2D(img.meta())
-            bgimg.paint(0.0)
-            bground_v.push_back( bgimg )
+            #bgimg  = larcv.Image2D(img.meta())
+            #bgimg.paint(0.0)
+            #bground_v.push_back( bgimg )
 
             predimg  = larcv.Image2D(img.meta())
             predimg.paint(0.0)
@@ -389,12 +434,13 @@ class SparseSSNetClient(Client):
             
         for p in xrange(wholeview_v.size()):
 
-            showerimg = shower_v.at(p)
-            trackimg  = track_v.at(p)
-            bgimg     = bground_v.at(p)
             predimg   = pred_v.at(p)
-
             wholemeta = wholeview_v.at(p).meta()
+
+            uburn_track  = larcv.Image2D( wholeview_v.at(p).meta() )
+            uburn_shower = larcv.Image2D( wholeview_v.at(p).meta() )
+            uburn_track.paint(0.0)
+            uburn_shower.paint(0.0)
             
             for sparseout in replies_vv[p]:
                 npts = int( sparseout.pixellist().size()/(sparseout.nfeatures()+2) )
@@ -436,19 +482,22 @@ class SparseSSNetClient(Client):
                         xrow = wholemeta.row( sparse_meta.pos_y(row) )
                         xcol = wholemeta.col( sparse_meta.pos_x(col) )
 
-                        showerimg.set_pixel( xrow, xcol, totshr )
-                        trackimg.set_pixel(  xrow, xcol, tottrk )
-                        bgimg.set_pixel(     xrow, xcol, bg )
+                        #showerimg.set_pixel( xrow, xcol, totshr )
+                        #trackimg.set_pixel(  xrow, xcol, tottrk )
+                        #bgimg.set_pixel(     xrow, xcol, bg )
                         predimg.set_pixel(   xrow, xcol, pred )
+                        uburn_track.set_pixel(  xrow, xcol, tottrk )
+                        uburn_shower.set_pixel( xrow, xcol, totshr )
                     except:
                         self._log.info("error assigning {} -- {} to wholeview. meta={}".format( (col,row),
                                                                                                 (sparse_meta.pos_x(col),
                                                                                                  sparse_meta.pos_y(row)),
                                                                                                 sparse_meta.dump() ) )
-                        
-            ev_shower.Append( showerimg )
-            ev_track.Append(  trackimg )
-            ev_bg.Append( bgimg )
+            ev_uburn[p].Append( uburn_shower )
+            ev_uburn[p].Append( uburn_track  )
+            #ev_shower.Append( showerimg )
+            #ev_track.Append(  trackimg )
+            #ev_bg.Append( bgimg )
             ev_pred.Append( predimg )
 
         
