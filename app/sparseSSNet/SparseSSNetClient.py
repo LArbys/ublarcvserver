@@ -123,14 +123,14 @@ class SparseSSNetClient(Client):
                 img   = wholeview_v.at(p)
                 meta  = img.meta()
                 imgnp = larcv.as_ndarray(img)
-                print("whole np shape: {}".format(imgnp.shape))
+                #print("whole np shape: {}".format(imgnp.shape))
                 nsplits_wire = int(imgnp.shape[0]/512)                
                 nsplits_tick = int(imgnp.shape[1]/512)
-                print("nsplits_wire={} nsplits_tick={}".format(nsplits_wire,nsplits_tick))
+                #print("nsplits_wire={} nsplits_tick={}".format(nsplits_wire,nsplits_tick))
                 for itick in xrange(nsplits_tick):
                     for iwire in xrange(nsplits_wire):
                         splitnp = imgnp[iwire*512:(iwire+1)*512,itick*512:(itick+1)*512]
-                        print("splitnp: {}".format(splitnp.shape))
+                        #print("splitnp: {}".format(splitnp.shape))
 
                         # redefine meta
                         splitmeta = larcv.ImageMeta( 512*meta.pixel_width(), 512*meta.pixel_height(),
@@ -139,7 +139,7 @@ class SparseSSNetClient(Client):
                                                      meta.min_y()+512*meta.pixel_height()*itick,
                                                      meta.plane() )
 
-                        print("{} {}: {}".format( (itick,iwire), (splitmeta.cols(),splitmeta.rows()), splitmeta.dump()) )
+                        #print("{} {}: {}".format( (itick,iwire), (splitmeta.cols(),splitmeta.rows()), splitmeta.dump()) )
                         splitimg = larcv.as_image2d_meta( splitnp, splitmeta )
                         img2d_v[p].append(splitimg)
                 
@@ -181,27 +181,23 @@ class SparseSSNetClient(Client):
 
         elif self._input_mode==SparseSSNetClient.WHOLE:
             self._log.debug("Work on Full Images")
-            thresh_v  = std.vector("float")(1,10.0)
+            thresh_v  = std.vector("float")(1,0.5)
             require_v = std.vector("int")(1,1)
             for plane in range(nplanes):
                 
                 img = wholeview_v.at(plane)
                 img2d_v[plane] = [img]
 
-                # pass sparse representation for effiency
-                #tmp_v = std.vector("larcv::Image2D")()
-                #tmp_v.push_back( img )
-                #img2d_v[plane] = [larcv.SparseImage(tmp_v,thresh_v,require_v)]
         else:
             raise ValueError("input mode [{}] not recognized".format(self._input_mode))
 
 
         # send messages and recieve replies
         replies = self.send_image_list(img2d_v,run=run,subrun=subrun,event=event)
-        print()
-        print("len(replies)", len(replies))
-        print("len(replies[0])", len(replies[0]))
-        print()
+        #print()
+        #print("len(replies)", len(replies))
+        #print("len(replies[0])", len(replies[0]))
+        #print()
         
         # format and store replies
         self.process_received_images(wholeview_v,replies)
@@ -231,14 +227,14 @@ class SparseSSNetClient(Client):
         received_uncompressed = 0
         imageid_received = {}
         nimages_sent = 0
-        print("PLANES:", planes)
+        #print("PLANES:", planes)
         for p in planes:
-            print()
-            print("plane: ", p)
+            #print()
+            #print("plane: ", p)
             if p not in masks_v:
                 masks_v[p] = []
 
-            #if p not in [2]:
+            #if p not in [0]:
             #    continue
 
 
@@ -282,7 +278,7 @@ class SparseSSNetClient(Client):
                 self._log.debug("num frames received from worker: {}"
                                 .format(len(workerout)))
                 # use the time worker is preparing next part, to convert image
-                print("Number of replies:", len(workerout))
+                self._log.debug("Number of replies: {}".format(len(workerout)))
                 for reply in workerout:
                     if reply==self._ERROR_NOMSGS:
                         try:
@@ -326,7 +322,7 @@ class SparseSSNetClient(Client):
             # if len(imgout_v[p])>0 and len(imgout_v[p])%2!=0:
             #     complete = False
             # should have got all images back
-            print(imageid_received)
+            #print(imageid_received)
             for id,received in imageid_received.items():
                 if not received:
                     complete = False
@@ -365,10 +361,12 @@ class SparseSSNetClient(Client):
         # make the track/shower images
         ev_shower = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_shower" )
         ev_track  = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_track" )
-        ev_bg     = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_background" )        
+        ev_bg     = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_background" )
+        ev_pred   = self._outlarcv.get_data(larcv.kProductImage2D, "sparseuresnet_prediction" )
         shower_v  = std.vector("larcv::Image2D")()
         track_v   = std.vector("larcv::Image2D")()
         bground_v = std.vector("larcv::Image2D")()
+        pred_v    = std.vector("larcv::Image2D")()
 
         for p in xrange(wholeview_v.size()):
             img = wholeview_v.at(p)
@@ -384,12 +382,17 @@ class SparseSSNetClient(Client):
             bgimg  = larcv.Image2D(img.meta())
             bgimg.paint(0.0)
             bground_v.push_back( bgimg )
+
+            predimg  = larcv.Image2D(img.meta())
+            predimg.paint(0.0)
+            pred_v.push_back( predimg )
             
         for p in xrange(wholeview_v.size()):
 
             showerimg = shower_v.at(p)
             trackimg  = track_v.at(p)
             bgimg     = bground_v.at(p)
+            predimg   = pred_v.at(p)
 
             wholemeta = wholeview_v.at(p).meta()
             
@@ -401,9 +404,9 @@ class SparseSSNetClient(Client):
                 sparse_meta = sparseout.meta(0)
                 
                 for ipt in xrange(npts):
-                    
-                    row = int(sparseout.pixellist().at( stride*ipt+1 ))
+
                     col = int(sparseout.pixellist().at( stride*ipt+0 ))
+                    row = int(sparseout.pixellist().at( stride*ipt+1 ))
                     
                     hip = sparseout.pixellist().at( stride*ipt+2 )
                     mip = sparseout.pixellist().at( stride*ipt+3 )
@@ -415,6 +418,19 @@ class SparseSSNetClient(Client):
                     totshr = shr+dlt+mic
                     tottrk = hip+mip
 
+                    maxscore = 0.
+                    maxarg   = 0
+                    for i,val in enumerate([hip,mip,totshr]):
+                        if val>maxscore:
+                            maxarg = i
+                            maxscore = val
+                    if maxarg==1:
+                        pred = 2 # track
+                    elif maxarg==2:
+                        pred = 3 # shower
+                    else:
+                        pred = 1 # hip
+
                     # translate to different meta
                     try:
                         xrow = wholemeta.row( sparse_meta.pos_y(row) )
@@ -423,14 +439,17 @@ class SparseSSNetClient(Client):
                         showerimg.set_pixel( xrow, xcol, totshr )
                         trackimg.set_pixel(  xrow, xcol, tottrk )
                         bgimg.set_pixel(     xrow, xcol, bg )
+                        predimg.set_pixel(   xrow, xcol, pred )
                     except:
-                        print("error assigning {} -- {} to wholeview. meta={}".format( (col,row),
-                                                                                       (sparse_meta.pos_x(col), sparse_meta.pos_y(row)),
-                                                                                       sparse_meta.dump() ) )
-                    
+                        self._log.info("error assigning {} -- {} to wholeview. meta={}".format( (col,row),
+                                                                                                (sparse_meta.pos_x(col),
+                                                                                                 sparse_meta.pos_y(row)),
+                                                                                                sparse_meta.dump() ) )
+                        
             ev_shower.Append( showerimg )
             ev_track.Append(  trackimg )
             ev_bg.Append( bgimg )
+            ev_pred.Append( predimg )
 
         
 

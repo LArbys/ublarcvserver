@@ -66,7 +66,7 @@ class SparseSSNetWorker(MDPyWorkerBase):
         self._use_half = use_half
         self._use_compression = use_compression
         if self._use_half:
-            print("Using half of mrcnn not tested")
+            print("Using half-precision for sparse ssnet not tested")
             assert 1==2
         service_name = "sparse_uresnet_plane%d"%(self.plane)
         super(SparseSSNetWorker,self).__init__( service_name,
@@ -86,16 +86,18 @@ class SparseSSNetWorker(MDPyWorkerBase):
                  "io_type":"larcv_sparse",  # -io
                  "batch_size":1,            # -bs
                  "num_class":5,             # -nc
+                 "uresnet_filters":16,      # -uf
                  "report_step":1,           # -rs
                  "spatial_size":512,        # -ss
                  "data_dim":2,              # -dd
                  "uresnet_num_strides": 5,  # -uns
                  "data_keys":"wire,label",  # -dkeys
                  "model_name":"uresnet_sparse", # -mn
-                 "iteration":10,            # -it
+                 "iteration":1,            # -it
                  "log_dir":"log/",          # -ld
                  "input_file":"none" }      # -if
         self.config.update(args)
+        self.config.TRAIN = False
         
         print("\n\n-- CONFIG --")
         for name in vars(self.config):
@@ -113,16 +115,16 @@ class SparseSSNetWorker(MDPyWorkerBase):
         self._log.info("Loaded ubMRCNN model. Service={}".format(service_name))
 
         # run random data (to test/reserve memory)
-        N = 20000
-        fake_sparse = np.zeros( (N,4) ) # (x,y,pixval,batch)
-        fake_sparse[:,0] = np.random.randint( 0, 512, N ).astype(np.float)
-        fake_sparse[:,1] = np.random.randint( 0, 512, N ).astype(np.float)
-        fake_sparse[:,2] = np.random.random( [N] ) # coords and
-        fake_sparse[:,3] = 0
-        print("passing in fake data: ",fake_sparse.shape)
-        data_blob = { 'data': [[fake_sparse]] }
-        results = self.trainval.forward( data_blob )
-        print("result keys: ",results.keys())
+        #N = 20000
+        #fake_sparse = np.zeros( (N,4) ) # (x,y,pixval,batch)
+        #fake_sparse[:,0] = np.random.randint( 0, 512, N ).astype(np.float) # x
+        #fake_sparse[:,1] = np.random.randint( 0, 512, N ).astype(np.float) # y
+        #fake_sparse[:,2] = 0  # batch id
+        #fake_sparse[:,3] = np.random.random( [N] ) # pixval
+        #print("passing in fake data: ",fake_sparse.shape)
+        #data_blob = { 'data': [[fake_sparse]] }
+        #results = self.trainval.forward( data_blob )
+        #print("result keys: ",results.keys())
 
 
     def make_reply(self,request,nreplies):
@@ -204,17 +206,19 @@ class SparseSSNetWorker(MDPyWorkerBase):
         idx      = 0
         for npts,img2d in zip( npts_v, img2d_v ):
             endidx   = startidx+npts
-            print("img2d type: {}".format(img2d))
             spimg_np = larcv.as_ndarray( img2d, larcv.msg.kNORMAL )
-            print("spimg_np shape: {}".format( spimg_np.shape ))
-            print("batch_np[startidx:endidx,0:3] shape: {}".format(batch_np[startidx:endidx,0:3].shape))
             #print("spimg_np: {}".format(spimg_np[:,0:2]))
             #batch_np[startidx:endidx,0:3] = spimg_np[:,:]
-            batch_np[startidx:endidx,0] = spimg_np[:,1]
-            batch_np[startidx:endidx,1] = spimg_np[:,0]
-            batch_np[startidx:endidx,2] = spimg_np[:,2]                        
-            batch_np[startidx:endidx,3]   = idx
-            print("batch_np: {}".format(batch_np[:,0:2]))
+            #batch_np[startidx:endidx,0] = spimg_np[:,1] # wire
+            #batch_np[startidx:endidx,1] = spimg_np[:,0] # tick
+
+            # transposed
+            batch_np[startidx:endidx,0] = spimg_np[:,0] # tick
+            batch_np[startidx:endidx,1] = spimg_np[:,1] # wire
+
+            batch_np[startidx:endidx,2] = idx           # batch index
+            batch_np[startidx:endidx,3] = spimg_np[:,2] # pixel value
+            #print("batch_np: {}".format(batch_np[:,0:2]))
             idx += 1
 
         # pass to network
@@ -222,23 +226,31 @@ class SparseSSNetWorker(MDPyWorkerBase):
         results = self.trainval.forward( data_blob )
 
         # format the resuls: store into sparseimage object
-        print("results[softmax]: {}".format(type(results['softmax'])))
+        #print("results[softmax]: {}".format(type(results['softmax'])))
         
         reply = []
         startidx = 0
         for idx in xrange(len(results['softmax'])):
             ssnetout_np = results['softmax'][idx]
-            print("ssneout_np: {}".format(ssnetout_np.shape))
+            #print("ssneout_np: {}".format(ssnetout_np.shape))
             rseid = rseid_v[idx]
             meta  = img2d_v[idx].meta(0)
             npts  = int( npts_v[idx] )
             endidx = startidx+npts
-            print("numpoints for img[{}]: {}".format(idx,npts))
+            #print("numpoints for img[{}]: {}".format(idx,npts))
             ssnetout_wcoords = np.zeros( (ssnetout_np.shape[0],ssnetout_np.shape[1]+2), dtype=np.float32 )
-            ssnetout_wcoords[:,0:2] = batch_np[startidx:endidx,0:2]
+
+            # normal
+            #ssnetout_wcoords[:,0:2] = batch_np[startidx:endidx,0:2]
+
+            # transposed
+            ssnetout_wcoords[:,0] = batch_np[startidx:endidx,1]
+            ssnetout_wcoords[:,1] = batch_np[startidx:endidx,0]
+
+            # pixel value
             ssnetout_wcoords[:,2:2+ssnetout_np.shape[1]] = ssnetout_np[:,:]
             startidx = endidx
-            print("ssnetout_wcoords: {}".format(ssnetout_wcoords[:,0:2]))
+            #print("ssnetout_wcoords: {}".format(ssnetout_wcoords[:,0:2]))
 
             meta_v = std.vector("larcv::ImageMeta")()
             for i in xrange(5):
@@ -253,7 +265,7 @@ class SparseSSNetWorker(MDPyWorkerBase):
                 compressed = bson
             reply.append(compressed)
 
-        print("next message id: {}".format(self._next_msg_id))
+        #print("next message id: {}".format(self._next_msg_id))
         
         if self._next_msg_id>=nmsgs:
             isfinal = True
