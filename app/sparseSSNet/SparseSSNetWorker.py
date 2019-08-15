@@ -35,6 +35,8 @@ class SparseSSNetWorker(MDPyWorkerBase):
     #              **kwargs):
     def __init__(self,broker_address,plane,
                  weight_file,batch_size,
+                 row_tick_dim=512,
+                 col_wire_dim=512,
                  device_id=None,
                  use_half=False,
                  use_compression=False,
@@ -88,7 +90,7 @@ class SparseSSNetWorker(MDPyWorkerBase):
                  "num_class":5,             # -nc
                  "uresnet_filters":16,      # -uf
                  "report_step":1,           # -rs
-                 "spatial_size":512,        # -ss
+                 "spatial_size":row_tick_dim, # -ss
                  "data_dim":2,              # -dd
                  "uresnet_num_strides": 5,  # -uns
                  "data_keys":"wire,label",  # -dkeys
@@ -98,6 +100,7 @@ class SparseSSNetWorker(MDPyWorkerBase):
                  "input_file":"none" }      # -if
         self.config.update(args)
         self.config.TRAIN = False
+        self.config.SPATIAL_SIZE=(row_tick_dim,col_wire_dim)
         
         print("\n\n-- CONFIG --")
         for name in vars(self.config):
@@ -212,8 +215,10 @@ class SparseSSNetWorker(MDPyWorkerBase):
             #batch_np[startidx:endidx,0] = spimg_np[:,1] # wire
             #batch_np[startidx:endidx,1] = spimg_np[:,0] # tick
 
-            # transposed
-            batch_np[startidx:endidx,0] = spimg_np[:,0] # tick
+            # flip
+            batch_np[startidx:endidx,0] = (self.config.SPATIAL_SIZE[0]-1)-spimg_np[:,0] # tick
+            
+            #batch_np[startidx:endidx,0] = spimg_np[:,0] # tick
             batch_np[startidx:endidx,1] = spimg_np[:,1] # wire
 
             batch_np[startidx:endidx,2] = idx           # batch index
@@ -244,8 +249,8 @@ class SparseSSNetWorker(MDPyWorkerBase):
             #ssnetout_wcoords[:,0:2] = batch_np[startidx:endidx,0:2]
 
             # transposed
-            ssnetout_wcoords[:,0] = batch_np[startidx:endidx,1]
-            ssnetout_wcoords[:,1] = batch_np[startidx:endidx,0]
+            ssnetout_wcoords[:,0] = (self.config.SPATIAL_SIZE[0]-1)-batch_np[startidx:endidx,0] # tick
+            ssnetout_wcoords[:,1] = batch_np[startidx:endidx,1]         # col
 
             # pixel value
             ssnetout_wcoords[:,2:2+ssnetout_np.shape[1]] = ssnetout_np[:,:]

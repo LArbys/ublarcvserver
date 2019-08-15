@@ -28,6 +28,8 @@ def start_sparse_uresnet_worker(broker_address,plane,
                                 weight_file,
                                 device_id,
                                 batch_size,
+                                nrows,
+                                ncols,
                                 ssh_thru_server,
                                 ssh_password):
 
@@ -35,6 +37,8 @@ def start_sparse_uresnet_worker(broker_address,plane,
     
     worker=SparseSSNetWorker(broker_address,plane,weight_file,
                              batch_size,
+                             row_tick_dim=nrows,
+                             col_wire_dim=ncols,
                              device_id=device_id,
                              ssh_thru_server=ssh_thru_server,
                              ssh_password=ssh_password )
@@ -44,6 +48,7 @@ def start_sparse_uresnet_worker(broker_address,plane,
 
 
 def startup_sparse_uresnet_workers( broker_address, weights_files,
+                                    nrows=512, ncols=512,
                                     device_id=0,
                                     batch_size=1,
                                     nplanes=[0,1,2],
@@ -57,7 +62,7 @@ def startup_sparse_uresnet_workers( broker_address, weights_files,
     for p in nplanes:
         pworker = Process(target=start_sparse_uresnet_worker,
                           args=(broker_address,p,weights_files[p],
-                                device_id,batch_size,
+                                device_id,batch_size,nrows,ncols,
                                 ssh_thru_server,ssh_password))
         pworker.daemon = True
         pworkers.append(pworker)
@@ -120,6 +125,7 @@ if __name__ == "__main__":
         if args.plane is not None:
             planes = [args.plane]
         pworkers = startup_sparse_uresnet_workers(endpoint,weights_files,
+                                                  nrows=512,ncols=512,
                                                   device_id=args.mode,
                                                   nplanes=planes,
                                                   batch_size=batch_size,

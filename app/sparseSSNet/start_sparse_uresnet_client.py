@@ -23,6 +23,10 @@ parser.add_argument("-sm","--split-mode",type=int,default=0,
                     help="split mode: 0=whole, 1=split, 2=opflash")
 parser.add_argument("--local",action="store_true",default=False,
                     help="runs a local job with a broker and worker on an inter process socket (ipc)")
+parser.add_argument("--nrows",type=int,default=512,
+                    help="number of rows of image. needed if starting worker")
+parser.add_argument("--ncols",type=int,default=512,
+                    help="number of columns of image. needed if starting worker")
 parser.add_argument("--weights-dir",type=str,default="None",
                     help="specify path to directory with weights (assumes weight names)")
 
@@ -69,6 +73,8 @@ if __name__ == "__main__":
                 
         workers_v = startup_sparse_uresnet_workers(endpoint,
                                                    weights_files,
+                                                   nrows=args.nrows,
+                                                   ncols=args.ncols,
                                                    nplanes=[0,1,2],
                                                    device_id="cpu",
                                                    batch_size=1)
@@ -81,8 +87,8 @@ if __name__ == "__main__":
                                tick_backwards=args.tickbackwards )
     client.connect()
 
-    #client.process_entries(start=0,end=4)
-    client.process_entries()
+    client.process_entries(start=0,end=0)
+    #client.process_entries()
 
     print("processed")
 

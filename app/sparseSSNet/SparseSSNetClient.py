@@ -451,8 +451,8 @@ class SparseSSNetClient(Client):
                 
                 for ipt in xrange(npts):
 
-                    col = int(sparseout.pixellist().at( stride*ipt+0 ))
-                    row = int(sparseout.pixellist().at( stride*ipt+1 ))
+                    row = int(sparseout.pixellist().at( stride*ipt+0 ))
+                    col = int(sparseout.pixellist().at( stride*ipt+1 ))
                     
                     hip = sparseout.pixellist().at( stride*ipt+2 )
                     mip = sparseout.pixellist().at( stride*ipt+3 )
