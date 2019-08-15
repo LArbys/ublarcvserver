@@ -17,8 +17,10 @@ parser.add_argument("-a","--adc",type=str,default="wire",
                     help="adc producer from input")
 parser.add_argument("-n","--out_tree_name",type=str,default="mrcnn",
                     help="output tree name")
-parser.add_argument("-t","--tick",type=bool,default=True,
+parser.add_argument("-tb","--tickbackwards",action="store_true",default=False,
                     help="specifies whether tick backwards")
+parser.add_argument("-sm","--split-mode",type=int,default=0,
+                    help="split mode: 0=whole, 1=split, 2=opflash")
 parser.add_argument("--local",action="store_true",default=False,
                     help="runs a local job with a broker and worker on an inter process socket (ipc)")
 parser.add_argument("--weights-dir",type=str,default="None",
@@ -43,6 +45,12 @@ if __name__ == "__main__":
     log = logging.getLogger("start_sparse_uresnet_client_main")
     logging.basicConfig(level=logging.DEBUG)
 
+    if args.split_mode not in [SparseSSNetClient.WHOLE,
+                               SparseSSNetClient.SPLIT,
+                               SparseSSNetClient.OPFLASH_ROI]:
+        print("unrecognized image pre-processing mode: {}".format(args.split_mode))
+        sys.exit(1)
+
     workers_v = None
     broker    = None
     if args.local:
@@ -65,14 +73,16 @@ if __name__ == "__main__":
                                                    device_id="cpu",
                                                    batch_size=1)
     
-
-    client = SparseSSNetClient(args.brokeraddr,args.input,args.output,
+    
+    client = SparseSSNetClient(args.brokeraddr,
+                               args.input,args.output,
                                adc_producer=args.adc,
-                               input_mode=SparseSSNetClient.WHOLE,
-                               tick_backwards=False )
+                               input_mode=args.split_mode,
+                               tick_backwards=args.tickbackwards )
     client.connect()
 
-    client.process_entries(start=0,end=4)
+    #client.process_entries(start=0,end=4)
+    client.process_entries()
 
     print("processed")
 
