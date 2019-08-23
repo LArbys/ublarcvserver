@@ -67,9 +67,15 @@ if __name__ == "__main__":
         broker = start_broker(endpoint)
 
         # weight files
-        weights_files = {0:args.weights_dir+"/Plane0Weights-13999.ckpt",
-                         1:args.weights_dir+"/Plane1Weights-17999.ckpt",
-                         2:args.weights_dir+"/Plane2Weights-26999.ckpt"}
+        #weights_files = {0:args.weights_dir+"/Plane0Weights-13999.ckpt",
+        #                 1:args.weights_dir+"/Plane1Weights-17999.ckpt",
+        #                 2:args.weights_dir+"/Plane2Weights-26999.ckpt"}
+        weights_files = {0:args.weights_dir+"/snapshot-36999.ckpt",
+                         1:args.weights_dir+"/snapshot-36999.ckpt",
+                         2:args.weights_dir+"/snapshot-36999.ckpt"}
+        #weights_files = {0:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt",
+        #                 1:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt",
+        #                 2:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt"}
                 
         workers_v = startup_sparse_uresnet_workers(endpoint,
                                                    weights_files,
@@ -84,6 +90,7 @@ if __name__ == "__main__":
                                args.input,args.output,
                                adc_producer=args.adc,
                                input_mode=args.split_mode,
+                               planes=[0,1,2],
                                tick_backwards=args.tickbackwards )
     client.connect()
 

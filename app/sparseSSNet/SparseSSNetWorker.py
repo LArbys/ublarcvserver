@@ -92,7 +92,7 @@ class SparseSSNetWorker(MDPyWorkerBase):
                  "report_step":1,           # -rs
                  "spatial_size":row_tick_dim, # -ss
                  "data_dim":2,              # -dd
-                 "uresnet_num_strides": 5,  # -uns
+                 "uresnet_num_strides": 6,  # -uns
                  "data_keys":"wire,label",  # -dkeys
                  "model_name":"uresnet_sparse", # -mn
                  "iteration":1,            # -it

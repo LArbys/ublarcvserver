@@ -26,7 +26,7 @@ class SparseSSNetClient(Client):
                  cropper_cfg=None,
                  larlite_opreco_file=None, opflash_producer="simpleFlashBeam",
                  tick_backwards=False,    sparseout_tree_name="uresnet",
-                 use_compression=False,   use_sparseimg=True,
+                 use_compression=False,   use_sparseimg=True, planes=None,
                  intimewin_min_tick=190,  intimewin_max_tick=320,
                  **kwargs):
         """
@@ -41,6 +41,7 @@ class SparseSSNetClient(Client):
         use_compression       [bool]  if false (default), do not compress byte string sent and received
         use_sparseimg         [bool]  if false (default), do not convert whole image into sparse. otherwisek, do. 
                                       To save bytes transferred.
+        planes                [list of int] if not None, only run in the specified planes
         intime_min_tick       [int]   Start of Time window  for trigger
         intime_max_tick       [int]   End of Time window  for trigger
         """
@@ -54,6 +55,7 @@ class SparseSSNetClient(Client):
         self._input_mode      = input_mode
         self._use_compression = use_compression
         self._cropper_cfg     = cropper_cfg
+        self._planes          = planes
 
         if self._input_mode == SparseSSNetClient.SPLIT:
             # SPLIT WHOLEVIEW IMAGE
@@ -275,8 +277,8 @@ class SparseSSNetClient(Client):
             if p not in masks_v:
                 masks_v[p] = []
 
-            #if p not in [0]:
-            #    continue
+            if type(self._planes) is list and p not in self._planes:
+                continue
 
 
             self._log.debug("sending images in plane[{}]: num={}."
