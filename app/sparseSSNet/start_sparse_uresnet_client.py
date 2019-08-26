@@ -70,9 +70,9 @@ if __name__ == "__main__":
         #weights_files = {0:args.weights_dir+"/Plane0Weights-13999.ckpt",
         #                 1:args.weights_dir+"/Plane1Weights-17999.ckpt",
         #                 2:args.weights_dir+"/Plane2Weights-26999.ckpt"}
-        weights_files = {0:args.weights_dir+"/snapshot-36999.ckpt",
-                         1:args.weights_dir+"/snapshot-36999.ckpt",
-                         2:args.weights_dir+"/snapshot-36999.ckpt"}
+        weights_files = {0:args.weights_dir+"/snapshot_plane0_16filter_6layers_22999.ckpt",
+                         1:args.weights_dir+"/snapshot_plane1_16filter_6layers_31999.ckpt",
+                         2:args.weights_dir+"/snapshot_plane2_16filter_6layers_36999.ckpt"}
         #weights_files = {0:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt",
         #                 1:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt",
         #                 2:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt"}
