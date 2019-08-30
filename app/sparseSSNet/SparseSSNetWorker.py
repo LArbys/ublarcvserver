@@ -12,7 +12,6 @@ from ublarcvserver import MDPyWorkerBase, Broker, Client
 larcv.json.load_jsonutils()
 from ROOT import std
 
-import cv2
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
