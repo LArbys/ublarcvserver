@@ -67,12 +67,11 @@ if __name__ == "__main__":
         broker = start_broker(endpoint)
 
         # weight files
-        #weights_files = {0:args.weights_dir+"/Plane0Weights-13999.ckpt",
-        #                 1:args.weights_dir+"/Plane1Weights-17999.ckpt",
-        #                 2:args.weights_dir+"/Plane2Weights-26999.ckpt"}
-        weights_files = {0:args.weights_dir+"/snapshot_plane0_16filter_6layers_22999.ckpt",
-                         1:args.weights_dir+"/snapshot_plane1_16filter_6layers_31999.ckpt",
-                         2:args.weights_dir+"/snapshot_plane2_16filter_6layers_36999.ckpt"}
+        # on tufts: @/cluster/tufts/wongjiradlab/larbys/dl_models/sparse_ssnet/v0_0_1_16filter_6layers
+        # on fnal:  @/cvmfs/uboone.opensciencegrid.org/products/ubSSNet/v0_0_1/NULL/weights
+        weights_files = {0:args.weights_dir+"/sparse_uresnet_plane0_16filter_6layers_22999.ckpt",
+                         1:args.weights_dir+"/sparse_uresnet_plane1_16filter_6layers_31999.ckpt",
+                         2:args.weights_dir+"/sparse_uresnet_plane2_16filter_6layers_36999.ckpt"}
         #weights_files = {0:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt",
         #                 1:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt",
         #                 2:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt"}
@@ -94,8 +93,8 @@ if __name__ == "__main__":
                                tick_backwards=args.tickbackwards )
     client.connect()
 
-    client.process_entries(start=0,end=0)
-    #client.process_entries()
+    #client.process_entries(start=0,end=0)
+    client.process_entries()
 
     print("processed")
 
