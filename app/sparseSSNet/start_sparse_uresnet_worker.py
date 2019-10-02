@@ -30,6 +30,8 @@ def start_sparse_uresnet_worker(broker_address,plane,
                                 batch_size,
                                 nrows,
                                 ncols,
+                                nlayers,
+                                nfilters,
                                 ssh_thru_server,
                                 ssh_password):
 
@@ -40,6 +42,8 @@ def start_sparse_uresnet_worker(broker_address,plane,
                              row_tick_dim=nrows,
                              col_wire_dim=ncols,
                              device_id=device_id,
+                             nlayers=nlayers,
+                             nfilters=nfilters,
                              ssh_thru_server=ssh_thru_server,
                              ssh_password=ssh_password )
     worker.connect()
@@ -52,6 +56,8 @@ def startup_sparse_uresnet_workers( broker_address, weights_files,
                                     device_id=0,
                                     batch_size=1,
                                     nplanes=[0,1,2],
+                                    nlayers=5,
+                                    nfilters=32,
                                     ssh_thru_server=None, ssh_password=None,
                                     start=True):
 
@@ -63,6 +69,7 @@ def startup_sparse_uresnet_workers( broker_address, weights_files,
         pworker = Process(target=start_sparse_uresnet_worker,
                           args=(broker_address,p,weights_files[p],
                                 device_id,batch_size,nrows,ncols,
+                                nlayers, nfilters,
                                 ssh_thru_server,ssh_password))
         pworker.daemon = True
         pworkers.append(pworker)

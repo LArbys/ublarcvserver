@@ -69,12 +69,17 @@ if __name__ == "__main__":
         # weight files
         # on tufts: @/cluster/tufts/wongjiradlab/larbys/dl_models/sparse_ssnet/v0_0_1_16filter_6layers
         # on fnal:  @/cvmfs/uboone.opensciencegrid.org/products/ubSSNet/v0_0_1/NULL/weights
-        weights_files = {0:args.weights_dir+"/sparse_uresnet_plane0_16filter_6layers_22999.ckpt",
-                         1:args.weights_dir+"/sparse_uresnet_plane1_16filter_6layers_31999.ckpt",
-                         2:args.weights_dir+"/sparse_uresnet_plane2_16filter_6layers_36999.ckpt"}
-        #weights_files = {0:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt",
-        #                 1:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt",
-        #                 2:args.weights_dir+"/snapshot_32filters_5layers-15999.ckpt"}
+        #weights_files = {0:args.weights_dir+"/sparse_uresnet_plane0_16filter_6layers_22999.ckpt",
+        #                 1:args.weights_dir+"/sparse_uresnet_plane1_16filter_6layers_31999.ckpt",
+        #                 2:args.weights_dir+"/sparse_uresnet_plane2_16filter_6layers_36999.ckpt"}
+        #weights_files = {0:args.weights_dir+"/snapshot_plane0_32filter_5layers_14999.ckpt",
+        #                 1:args.weights_dir+"/",
+        #                 2:args.weights_dir+"/snapshot_plane2_32filters_5layers-15999.ckpt"}
+        # v2
+        # nlayers=5, nfilters=32
+        weights_files = {0:args.weights_dir+"/../v1/snapshot_plane0_32filter_5layers_14999.ckpt",
+                         1:args.weights_dir+"/Plane1_32_5_weighting.ckpt",
+                         2:args.weights_dir+"/Plane2_32_5_weighting.ckpt"}
                 
         workers_v = startup_sparse_uresnet_workers(endpoint,
                                                    weights_files,
@@ -82,6 +87,8 @@ if __name__ == "__main__":
                                                    ncols=args.ncols,
                                                    nplanes=[0,1,2],
                                                    device_id="cpu",
+                                                   nlayers=5,
+                                                   nfilters=32,
                                                    batch_size=1)
     
     
@@ -93,7 +100,7 @@ if __name__ == "__main__":
                                tick_backwards=args.tickbackwards )
     client.connect()
 
-    #client.process_entries(start=0,end=0)
+    #client.process_entries(start=0,end=2)
     client.process_entries()
 
     print("processed")

@@ -38,6 +38,8 @@ class SparseSSNetWorker(MDPyWorkerBase):
                  col_wire_dim=512,
                  device_id=None,
                  use_half=False,
+                 nlayers=5,
+                 nfilters=32,
                  use_compression=False,
                  **kwargs):
         """
@@ -81,22 +83,24 @@ class SparseSSNetWorker(MDPyWorkerBase):
               -mn uresnet_sparse -it 10 -ld log/ -if PATH_TO_INPUT_ROOT_FILE
         """
         self.config = uresnet.flags.URESNET_FLAGS()
-        args = { "full":True,               # --full
-                 "plane":self.plane,        # -pl
-                 "model_path":weight_file,  # -mp
-                 "io_type":"larcv_sparse",  # -io
-                 "batch_size":1,            # -bs
-                 "num_class":5,             # -nc
-                 "uresnet_filters":16,      # -uf
-                 "report_step":1,           # -rs
-                 "spatial_size":row_tick_dim, # -ss
-                 "data_dim":2,              # -dd
-                 "uresnet_num_strides": 6,  # -uns
-                 "data_keys":"wire,label",  # -dkeys
-                 "model_name":"uresnet_sparse", # -mn
-                 "iteration":1,            # -it
-                 "log_dir":"log/",          # -ld
-                 "input_file":"none" }      # -if
+
+        args = { "full":True,                    # --full
+                 "plane":self.plane,             # -pl
+                 "model_path":weight_file,       # -mp
+                 "io_type":"larcv_sparse",       # -io
+                 "batch_size":1,                 # -bs
+                 "num_class":5,                  # -nc
+                 "uresnet_filters":nfilters,     # -uf
+                 "report_step":1,                # -rs
+                 "spatial_size":row_tick_dim,    # -ss
+                 "data_dim":2,                   # -dd
+                 "uresnet_num_strides": nlayers, # -uns
+                 "data_keys":"wire,label",       # -dkeys
+                 "model_name":"uresnet_sparse",  # -mn
+                 "iteration":1,                  # -it
+                 "log_dir":"log/",               # -ld
+                 "input_file":"none" }           # -if
+        
         self.config.update(args)
         self.config.TRAIN = False
         self.config.SPATIAL_SIZE=(row_tick_dim,col_wire_dim)
