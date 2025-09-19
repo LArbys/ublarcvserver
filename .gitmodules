@@ -7,3 +7,6 @@
 [submodule "networks/sparse_ssnet"]
 	path = networks/sparse_ssnet
 	url = https://github.com/NuTufts/uresnet_pytorch.git
+[submodule "networks/uresnet_pytorch"]
+	path = networks/uresnet_pytorch
+	url = https://github.com/nutufts/uresnet_pytorch
